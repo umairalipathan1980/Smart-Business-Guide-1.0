@@ -17,6 +17,5 @@ langchain-openai
 pydantic
 streamlit
 chromadb>=0.4.0
-sqlite3
 
 
