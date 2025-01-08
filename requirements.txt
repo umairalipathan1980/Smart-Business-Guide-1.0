@@ -10,9 +10,13 @@ langchain-huggingface
 langchain-chroma
 sentence-transformers
 spacy
-langchain
+langchain>=0.0.80
 flashrank
 beautifulsoup4
 langchain-openai
 pydantic
 streamlit
+chromadb>=0.4.0
+sqlite3>=3.35.0
+
+
