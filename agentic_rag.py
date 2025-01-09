@@ -359,9 +359,9 @@ def grade_documents(state):
     if not documents:
         print("No documents retrieved for grading.")
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
-
+    
+    print(f"Grading retrieved documents with {llm.model_name}")
     for count, doc in enumerate(documents):
-        print(f"Grading retrieved documents with {llm.model_name}")
         try:
             # Evaluate document relevance
             score = doc_grader.invoke({"documents": [doc], "question": question})
