@@ -212,9 +212,9 @@ model_list = [
     "llama-3.1-8b-instant", 
     "llama3-8b-8192", 
     "mixtral-8x7b-32768", 
-    "gemma2-9b-it"
-    # "gpt-4o-mini",
-    # "gpt-4o"
+    "gemma2-9b-it",
+    "gpt-4o-mini",
+    "gpt-4o"
     ]
 
 ###Prompt for RAG generation
