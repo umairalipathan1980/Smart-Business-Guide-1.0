@@ -7,8 +7,6 @@ from agentic_rag import initialize_app, update_llm
 import sys
 import io
 import os
-import config
-
 # Configure the Streamlit page layout
 st.set_page_config(
     page_title="Smart Business Guide",
