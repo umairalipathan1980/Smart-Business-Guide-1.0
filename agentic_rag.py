@@ -701,7 +701,7 @@ def route_question(state):
     }
 
     # Invoke the chain
-    tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
+    tool = (prompt | llm | StrOutputParser()).invoke(inputs)
     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
     if not "unrelated" in tool:
         print(f"Invoking {tool} tool ")
