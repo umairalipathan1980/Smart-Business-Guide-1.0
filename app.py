@@ -34,7 +34,7 @@ with st.sidebar:
 
     # Initialize session state for the model if it doesn't exist
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = "llama-3.3-70b-versatile"
+        st.session_state.selected_model = "llama-3.1-8b-instant"
 
     model_list = [
         "llama-3.1-8b-instant",
