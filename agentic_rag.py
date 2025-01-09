@@ -361,7 +361,7 @@ def grade_documents(state):
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
 
     for count, doc in enumerate(documents):
-        print(f"Grading retrieved documents with {llm}")
+        print(f"Grading retrieved documents with {llm.model_name}")
         try:
             # Evaluate document relevance
             score = doc_grader.invoke({"documents": [doc], "question": question})
@@ -704,7 +704,7 @@ def route_question(state):
     tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
     if not "unrelated" in tool:
-        print(f"Invoking {tool} tool through {router_llm}")
+        print(f"Invoking {tool} tool through {router_llm.model_name}")
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
