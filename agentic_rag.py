@@ -459,9 +459,6 @@ def generate(state):
             # print(f"Generating a {answer_style} length response.")
             print(f"Response generated with {llm.model_name} model.")
             print("Done.")
-
-            #print(f"Response from model {current_model}: {generation}")
-
             # Revert to the original model if the current model is different
             if current_model_index != original_model_index:
                 print(f"Reverting to original model: {model_list[original_model_index]}")
