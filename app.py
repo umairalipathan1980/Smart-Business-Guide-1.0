@@ -2,17 +2,21 @@ __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
-from agentic_rag import initialize_app, update_llm
+from agentic_rag import initialize_app
 import sys
 import io
 import os
+import time
+
 
 # Configure the Streamlit page layout
 st.set_page_config(
     page_title="Smart Business Guide",
     layout="wide",
     initial_sidebar_state="expanded",
+    page_icon = "🧠"
 )
+
 
 # Initialize session state for messages
 if "messages" not in st.session_state:
@@ -25,35 +29,54 @@ with st.sidebar:
     except Exception as e:
         st.warning("Unable to load image. Continuing without it.")
 
-    st.title("📘 Smart Guide 1.0")
-    st.markdown("**Actions:**")
-    model_list = [
-    "llama-3.3-70b-versatile",
-    "llama3-70b-8192",  
-    "llama-3.1-8b-instant", 
-    "llama3-8b-8192", 
-    "mixtral-8x7b-32768", 
-    "gemma2-9b-it"
-    # "gpt-4o-mini",
-    # "gpt-4o"
-    ]
-    # Modify the sidebar to include model selection
-    model = st.sidebar.selectbox("Select Model", model_list)
+    st.title("🗣️ Smart Guide 1.0")
+    st.markdown("**▶️ Actions:**")
 
-    search_option = st.sidebar.radio(
-    "Search options",
-    ["Smart guide + tools", "Internet search only", "Hybrid search (Guides + internet)"],
-    index=0
+    # Initialize session state for the model if it doesn't exist
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = "llama-3.3-70b-versatile"
+
+    model_list = [
+        "llama-3.3-70b-versatile",
+        "llama3-70b-8192",  
+        "llama-3.1-8b-instant", 
+        "llama3-8b-8192", 
+        "mixtral-8x7b-32768", 
+        "gemma2-9b-it"
+        # "gpt-4o-mini",
+        # "gpt-4o"
+    ]
+
+    with st.expander("⚙️ Settings", expanded=False):
+        st.session_state.selected_model = st.selectbox(
+            "🧠 Select Model",
+            model_list,
+            key="model_selector",
+            index=model_list.index(st.session_state.selected_model)
+        )
+        # Add the slider for answer style
+        answer_style = st.select_slider(
+            "💬 Answer Style",
+            options=["Concise", "Moderate", "Explanatory"],
+            value="Concise",
+            key="answer_style_slider"
+        )
+
+    search_option = st.radio(
+        "Search options",
+        ["📘🛠️ Smart guide + tools", "🌐 Internet search only", "📘🔍 Hybrid search (Guides + internet)"],
+        index=0
     )
 
     # Set the corresponding boolean values based on the selected option
     hybrid_search = search_option == "Hybrid search (Guides + internet)"
     internet_search = search_option == "Internet search only"
     
-    reset_button = st.button("Reset Conversation")
+    reset_button = st.button("🔄 Reset Conversation", key="reset_button")
+
 
     # Initialize the app with the selected model
-    app = initialize_app(model, hybrid_search, internet_search)
+    app = initialize_app(st.session_state.selected_model, hybrid_search, internet_search, answer_style)
     if reset_button:
         st.session_state.messages = []
 # Title
@@ -64,9 +87,10 @@ st.markdown(
         🤖 <b>Welcome to your Smart Business Guide!</b><br>
         I am here to assist you with:<br>
         <ul style="list-style-position: inside; text-align: left; display: inline-block;">
-            <li>Finding answers from business and entrepreneurship guides in Finland</li>
-            <li>Providing up-to-date information through internet search</li>
-            <li>Specialized guidance for tax-related information, permits & licenses, business registration, residence permits, etc. :</li>
+            <li>AI agents based approach for finding answers from business and entrepreneurship guides in Finland</li>
+            <li>Providing up-to-date information through AI-based internet search</li>
+            <li>Automatically invoking AI-based internet search based on query understanding </li>
+            <li>Specialized tools for tax-related information, permits & licenses, business registration, residence permits, etc. :</li>
         </ul>
         <p style="margin-top: 10px;"><b>Start by typing your question in the chat below, and I'll provide tailored answers for your business needs!</b></p>
     </div>
@@ -106,7 +130,7 @@ if user_input := st.chat_input("Type your question (Max. 100 char):"):
                 # Show spinner while streaming the response
                 with st.spinner("Thinking..."):
                     #inputs = {"question": user_input}
-                    inputs = {"question": user_input, "hybrid_search": hybrid_search, "internet_search":internet_search}
+                    inputs = {"question": user_input, "hybrid_search": hybrid_search, "internet_search":internet_search, "answer_style":answer_style}
                     for i, output in enumerate(app.stream(inputs)):
                         # Capture intermediate print messages
                         debug_logs = output_buffer.getvalue()
