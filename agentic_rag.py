@@ -654,65 +654,7 @@ def get_licensing_info(state):
         }
 
 # # Router function
-# def route_question(state):
-#     question = state["question"]
-#     hybrid_search_enabled = state.get("hybrid_search", False)
-#     internet_search_enabled = state.get("internet_search", False)
-    
-#     if hybrid_search_enabled:
-#         return "hybrid_search"
-    
-#     if internet_search_enabled:
-#         return "websearch"
-
-#     tool_selection = {
-#         "get_tax_info": "question related to tax related information including current tax rates, taxation rules, taxable incomes, tax exemption, tax filing process, etc., but not asking information about any other country or city except Finland.",
-#         "get_contact_tool": "question related to contact information of the Finnish Immigration Service, also known as Migri (but not asking information about any other country or city except Finland.)",
-#         "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
-#         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
-#         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-#         "retrieve": "All other question related to business and entrepreneurship not covered by the other tools, but not asking information about any other country or city except Finland.)",
-#         "unrelated": "Questions not related to business and entrepreneurship in Finland, or related to other countries instead of Finland."
-#     }
-
-#     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
-#                  - Analyze the given question and use the given tool selection dictionary to output the name of the relevant tool based on its description and relevancy with the question. 
-#                    The dictionary has tool names as keys and their descriptions as values. 
-#                  - Output only and only tool name, i.e., the exact key and nothing else with no explanations at all. 
-#                 """
-
-#     # Define the ChatPromptTemplate
-#     prompt = ChatPromptTemplate.from_messages(
-#         [
-#             ("system", SYS_PROMPT),
-#             ("human", """Here is the question:
-#                         {question}
-#                         Here is the tool selection dictionary:
-#                         {tool_selection}
-#                         Output the required tool.
-#                     """),
-#         ]
-#     )
-
-#     # Pass the inputs to the prompt
-#     inputs = {
-#         "question": question,
-#         "tool_selection": tool_selection
-#     }
-
-#     # Invoke the chain
-#     tool = (prompt | llm | StrOutputParser()).invoke(inputs)
-#     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
-#     if not "unrelated" in tool:
-#         print(f"Invoking {tool} tool ")
-#     if "websearch" in tool:
-#         print("I need to get recent information from this query.")
-#     return tool
-
-
-# Router function
 def route_question(state):
-    global llm
     question = state["question"]
     hybrid_search_enabled = state.get("hybrid_search", False)
     internet_search_enabled = state.get("internet_search", False)
@@ -758,40 +700,14 @@ def route_question(state):
         "tool_selection": tool_selection
     }
 
-    original_model_index = model_list.index(llm.model_name)  # Save the index of the original model
-    current_model_index = original_model_index  # Start with the original model
-    tried_models = set()  # Keep track of tried models
-
-    while len(tried_models) < len(model_list):  # Stop after all models have been tried
-        try:
-            # Get the current model
-            current_model = model_list[current_model_index]
-            tried_models.add(current_model)  # Mark the model as tried
-
-            llm = initialize_llm(current_model, answer_style)
-
-            tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
-            # Revert to the original model if the current model is different
-            if current_model_index != original_model_index:
-                print(f"Reverting to original model: {model_list[original_model_index]}")
-                current_model_index = original_model_index
-
-            return {"documents": documents, "question": question, "generation": generation}
-
-        except Exception as e:
-            error_message = str(e)
-            if "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message or "Rate limit reached for model" in error_message:
-                print("Request too large or model's rate limite exceeded.")
-                current_model_index = (current_model_index + 1) % len(model_list)
-                print(f"Switching to model: {model_list[current_model_index]}")
-
+    # Invoke the chain
+    tool = (prompt | llm | StrOutputParser()).invoke(inputs)
     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
     if not "unrelated" in tool:
         print(f"Invoking {tool} tool ")
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
-
 
 
 workflow = StateGraph(GraphState)
