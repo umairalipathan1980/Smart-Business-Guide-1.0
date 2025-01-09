@@ -471,12 +471,8 @@ def generate(state):
 
         except Exception as e:
             error_message = str(e)
-            if not ("rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message):
-                print(f"Error during generation with model {current_model}: {error_message}")
-            elif "rate_limit_exceeded" in error_message:
-                print("Model's rate limit exceeded.")
-            elif "Request too large" in error_message:
-                print("Request too large for model {model}.")
+            if "rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message:
+                print(f"Model's rate limit exceeded or request too large.")
 
             # Handle model-specific errors (e.g., token limits)
             if "rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message:
