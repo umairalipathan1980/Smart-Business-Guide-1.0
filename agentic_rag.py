@@ -1,5 +1,3 @@
-###check modifying for llamaparse output
-
 
 import os
 import streamlit as st
@@ -182,7 +180,7 @@ else:
 
 # Global variable to store the current LLM
 llm = None
-router_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0)
+router_llm = ChatGroq(model="gemma2-9b-it", temperature=0.0)
 def initialize_app(model_name, hybrid_search, internet_search):
     global llm, doc_grader
     llm = initialize_llm(model_name)
@@ -299,7 +297,7 @@ def initialize_grader_chain():
         )
 
     # LLM for grading
-    structured_llm_grader = llm.with_structured_output(GradeDocuments)
+    structured_llm_grader = router_llm.with_structured_output(GradeDocuments)
 
     # Prompt template for grading
     SYS_PROMPT = """You are an expert grader assessing relevance of a retrieved document to a user question.
@@ -668,7 +666,7 @@ def route_question(state):
     }
 
     # Invoke the chain
-    tool = (prompt | llm | StrOutputParser()).invoke(inputs)
+    tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
     if not "unrelated" in tool:
         print(f"Invoking {tool} tool ")
@@ -726,7 +724,3 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
-
-
-
-
