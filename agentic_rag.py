@@ -456,7 +456,7 @@ def generate(state):
             # Format context and generate response
             context = format_documents(documents)
             generation = rag_chain.invoke({"context": context, "question": question, "answer_style" : answer_style})  # **Invocation**
-            # print(f"Generating a {answer_style} length response.")
+            print(f"Generating a {answer_style} length response.")
             print(f"Response generated with {llm.model_name} model.")
             print("Done.")
             # Revert to the original model if the current model is different
