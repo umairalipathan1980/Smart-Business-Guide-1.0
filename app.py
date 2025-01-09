@@ -64,7 +64,7 @@ with st.sidebar:
 
     search_option = st.radio(
         "Search options",
-        ["📘🛠️ Smart guide + tools", "🌐 Internet search only", "📘🔍 Hybrid search (Guides + internet)"],
+        ["Smart guide + tools", "Internet search only", "Hybrid search (Guides + internet)"],
         index=0
     )
 
