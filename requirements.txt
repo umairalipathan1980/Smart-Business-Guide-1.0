@@ -16,6 +16,8 @@ beautifulsoup4
 langchain-openai
 pydantic
 streamlit
-chromadb>=0.4.0
+chromadb
+pysqlite3-binary
+
 
 
