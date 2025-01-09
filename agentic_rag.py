@@ -457,7 +457,7 @@ def generate(state):
             context = format_documents(documents)
             generation = rag_chain.invoke({"context": context, "question": question, "answer_style" : answer_style})  # **Invocation**
             # print(f"Generating a {answer_style} length response.")
-            # print(f"Generated with {llm.model_name} model.")
+            print(f"Response generated with {llm.model_name} model.")
             print("Done.")
 
             #print(f"Response from model {current_model}: {generation}")
