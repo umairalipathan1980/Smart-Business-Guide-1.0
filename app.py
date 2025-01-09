@@ -59,7 +59,8 @@ with st.sidebar:
             "💬 Answer Style",
             options=["Concise", "Moderate", "Explanatory"],
             value="Concise",
-            key="answer_style_slider"
+            key="answer_style_slider",
+            disabled=True
         )
 
     search_option = st.radio(
