@@ -181,24 +181,30 @@ else:
 # Global variable to store the current LLM
 llm = None
 router_llm = ChatGroq(model="gemma2-9b-it", temperature=0.0)
-def initialize_app(model_name, hybrid_search, internet_search):
+def initialize_app(model_name, hybrid_search, internet_search, answer_style):
     global llm, doc_grader
-    llm = initialize_llm(model_name)
+    llm = initialize_llm(model_name, answer_style)
     doc_grader = initialize_grader_chain()
     return workflow.compile()
 
 
-def update_llm(model_name):
-    global llm, doc_grader
-    llm = initialize_llm(model_name)
-    doc_grader = initialize_grader_chain()
-    # Update rag_chain and other components that use the LLM
+# def update_llm(model_name):
+#     global llm, doc_grader
+#     llm = initialize_llm(model_name, answer_style)
+#     doc_grader = initialize_grader_chain()
+#     # Update rag_chain and other components that use the LLM
 
-def initialize_llm(model_name):
+def initialize_llm(model_name, answer_style):
+    if answer_style == "Concise":
+        temperature = 0.0
+    elif answer_style == "Moderate":
+        temperature = 0.2
+    elif answer_style == "Explanatory":
+        temperature = 0.4
     if "gpt-" in model_name:
-        return ChatOpenAI(model=model_name, temperature=0.0)
+        return ChatOpenAI(model=model_name, temperature=temperature)
     else:
-        return ChatGroq(model=model_name, temperature=0.0)
+        return ChatGroq(model=model_name, temperature=temperature)
 
 model_list = [
     "llama-3.3-70b-versatile",
@@ -211,7 +217,7 @@ model_list = [
     # "gpt-4o"
     ]
 
-# Prompt for RAG generation
+###Prompt for RAG generation
 # rag_prompt = PromptTemplate(
 #     template=r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You are an honest and smart assistant specialized to answer questions related to business and entrepreneurship in Finland. 
 #                 You must provide a precise answer to a query from the given context. 
@@ -238,20 +244,22 @@ model_list = [
 #                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
 #                 input_variables=["question", "context"],
 # )
-
 rag_prompt = PromptTemplate(
     template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
                 You are a highly accurate and trustworthy assistant specialized in answering questions related to business and entrepreneurship in Finland. 
-                Your responses must strictly adhere to the provided context and follow these rules:
+                Your responses must strictly adhere to the provided context, answer style, using the follow these rules:
 
-                1. **Context-Only Answers**:
-                - Always base your answers solely on the provided context.
+                1. **Context-Only Answers with a given answer style**:
+                - Always base your answers on the provided context and answer style.
                 - If the context does not contain relevant information, respond with: 'No information found.'
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
-                2. **Precise and Concise Responses**:
-                - Address the query directly without unnecessary elaboration or speculative information.
-                - Do not draw from your knowledge base; strictly use the given context.
+                2. **Response style**:
+                - Address the query directly without unnecessary or speculative information.
+                - Do not draw from your knowledge base; strictly use the given context. However, take some liberty to provide more explanations and illustrations for better clarity and demonstration from your knowledge and experience only if answer style is "Moderate" or "Explanatory". 
+                - Consider the given answer style to produce the answer. If answer style = "Concise", generate a precise and concise answer. If answer style = "Moderate", use a moderate approach to generate answer
+                  where you can provide a little bit more explanation and elaborate the answer to improve clarity, integrating your own experience. If answer style = "Explanatory", elaborate the answer to provide more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience.
+                  However, the explanations, examples and illustrations should be strictly based on the context. 
 
                 3. **Conversational tone**
                  - Maintain a conversational but professional tone. 
@@ -277,14 +285,15 @@ rag_prompt = PromptTemplate(
                     - Do not combine the data in the two sections. Create two separate sections. 
 
                 7. **Integrity and Trustworthiness**:
-                - Never provide information that is not explicitly found in the context.
+                - Never provide information that is not explicitly found in the context, unless the answer style is "explanatory" in which you can add some examples and explanations only for illustration purposes.
                 - Ensure every part of your response complies with these rules.
 
                 <|eot_id|><|start_header_id|>user<|end_header_id|>
                 Question: {question} 
                 Context: {context} 
+                Answer style: {answer_style}
                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-                input_variables=["question", "context"]
+                input_variables=["question", "context", "answer_style"]
 
 )
 
@@ -373,6 +382,7 @@ class GraphState(TypedDict):
     generation: str
     web_search_needed: str
     documents: List[Document]
+    answer_style: str
 
 # Define nodes
 
@@ -396,6 +406,7 @@ def format_documents(documents):
 def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
+    answer_style = state.get("answer_style", "Concise") 
     global llm
     # Use current_llm instead of initializing a new one
     rag_chain = rag_prompt | llm | StrOutputParser()
@@ -414,15 +425,16 @@ def generate(state):
             current_model = model_list[current_model_index]
             tried_models.add(current_model)  # Mark the model as tried
 
-            llm = initialize_llm(current_model)
+            llm = initialize_llm(current_model, answer_style)
 
             # Reinitialize rag_chain with the new LLM
             rag_chain = rag_prompt | llm | StrOutputParser()  # **Rebinding rag_chain**
 
             # Format context and generate response
             context = format_documents(documents)
-            generation = rag_chain.invoke({"context": context, "question": question})  # **Invocation**
-            #print(f"Generated with {llm.model_name} model.")
+            generation = rag_chain.invoke({"context": context, "question": question, "answer_style" : answer_style})  # **Invocation**
+            print(f"Generating a {answer_style} length response.")
+            print(f"Generated with {llm.model_name} model.")
             print("Done.")
 
             #print(f"Response from model {current_model}: {generation}")
@@ -724,3 +736,7 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
+
+
+
+
