@@ -146,8 +146,8 @@ for message in st.session_state.messages:
             st.markdown(f"**Assistant:** {message['content']}")
 
 # Input box at the bottom for new messages
-if user_input := st.chat_input("Type your question (Max. 100 char):"):
-    if len(user_input) > 100:
+if user_input := st.chat_input("Type your question (Max. 150 char):"):
+    if len(user_input) > 150:
         st.error("Your question exceeds 100 characters. Please shorten it and try again.")
     else:
         # Add user's message to session state and display it
