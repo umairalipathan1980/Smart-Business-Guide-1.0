@@ -91,7 +91,7 @@ def remove_tags(soup):
             content += '- ' + text + '\n'
     return content
 
-@st.cache_data
+#@st.cache_data
 def get_info(URLs):
     """
     Fetch and return contact information from predefined URLs.
@@ -109,7 +109,7 @@ def get_info(URLs):
             combined_info += f"Error fetching URL {url}: {e}\n\n"
     return combined_info
 
-@st.cache_data
+#@st.cache_data
 def staticChunker(folder_path):
     docs = []
     print(f"Creating chunks. CHUNK_SIZE: {CHUNK_SIZE}, CHUNK_OVERLAP: {CHUNK_OVERLAP}")
@@ -134,7 +134,7 @@ def staticChunker(folder_path):
             docs.extend(chunked_docs)
     return docs
 
-@st.cache_resource
+#@st.cache_resource
 def load_or_create_vs(persist_directory):
     # Check if the vector store directory exists
     if os.path.exists(persist_directory):
@@ -210,7 +210,7 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
 
     return workflow.compile()
 
-@st.cache_resource
+#@st.cache_resource
 def initialize_llm(model_name, answer_style):
     if "llm" not in st.session_state or st.session_state.llm.model_name != model_name:
         if answer_style == "Concise":
@@ -237,7 +237,7 @@ def initialize_embedding_model(selected_embedding_model):
     
     return st.session_state.embed_model
 
-@st.cache_resource
+#@st.cache_resource
 def initialize_router_llm(selected_routing_model):
     if "router_llm" not in st.session_state or st.session_state.router_llm.model_name != selected_routing_model:
         if "gpt-" in selected_routing_model:
@@ -247,7 +247,7 @@ def initialize_router_llm(selected_routing_model):
     
     return st.session_state.router_llm
 
-@st.cache_resource
+#@st.cache_resource
 def initialize_grading_llm(selected_grading_model):
     if "grader_llm" not in st.session_state or st.session_state.grader_llm.model_name != selected_grading_model:
         if "gpt-" in selected_grading_model:
@@ -480,7 +480,7 @@ def hybrid_search(state):
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
 
-@st.cache_data
+#@st.cache_data
 def web_search(state):
     if "tavily_client" not in st.session_state:
         st.session_state.tavily_client = TavilyClient()
