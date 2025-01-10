@@ -1,6 +1,6 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 from agentic_rag import initialize_app
 import sys
@@ -16,7 +16,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     page_icon = "🧠"
 )
-
 
 # Initialize session state for messages
 if "messages" not in st.session_state:
@@ -34,7 +33,16 @@ with st.sidebar:
 
     # Initialize session state for the model if it doesn't exist
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = "llama-3.1-8b-instant"
+        st.session_state.selected_model = "gpt-4o"
+
+    if "selected_routing_model" not in st.session_state:
+        st.session_state.selected_routing_model = "gpt-4o"
+
+    if "selected_grading_model" not in st.session_state:
+        st.session_state.selected_grading_model = "gpt-4o"
+
+    if "selected_embedding_model" not in st.session_state:
+        st.session_state.selected_embedding_model = "gpt-4o"
 
     model_list = [
         "llama-3.1-8b-instant",
@@ -47,12 +55,38 @@ with st.sidebar:
         "gpt-4o"
     ]
 
+    embed_list = [
+        "text-embedding-3-large",
+        "sentence-transformers/all-MiniLM-L6-v2"
+    ]
+
     with st.expander("⚙️ Settings", expanded=False):
         st.session_state.selected_model = st.selectbox(
-            "🧠 Select Model",
+            "🤖 Select Answering LLM",
             model_list,
             key="model_selector",
             index=model_list.index(st.session_state.selected_model)
+        )
+
+        st.session_state.selected_routing_model = st.selectbox(
+            "📡 Select Routing LLM",
+            model_list,
+            key="routing_model_selector",
+            index=model_list.index(st.session_state.selected_routing_model)
+        )
+
+        st.session_state.selected_grading_model = st.selectbox(
+            "🧮 Select Retrieval Grading LLM",
+            model_list,
+            key="grading_model_selector",
+            index=model_list.index(st.session_state.selected_grading_model)
+        )
+
+        st.session_state.selected_embedding_model = st.selectbox(
+            "🧠 Select Embedding Model",
+            embed_list,
+            key="embedding_model_selector",
+            index=embed_list.index(st.session_state.selected_embedding_model)
         )
         # Add the slider for answer style
         answer_style = st.select_slider(
@@ -77,7 +111,7 @@ with st.sidebar:
 
 
     # Initialize the app with the selected model
-    app = initialize_app(st.session_state.selected_model, hybrid_search, internet_search, answer_style)
+    app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
     if reset_button:
         st.session_state.messages = []
 # Title
