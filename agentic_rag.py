@@ -158,50 +158,43 @@ def load_or_create_vs(persist_directory):
 
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
-    Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
-    Reinitialize components only if the selection has changed.
+    Initialize session-specific embeddings, vectorstore, retriever, and LLM for the RAG workflow.
     """
-    global llm, doc_grader, embed_model, vectorstore, retriever, router_llm, grader_llm
+    if "models" not in st.session_state:
+        st.session_state.models = {}
 
-    # Track current state to prevent redundant initialization
-    if "current_model_state" not in st.session_state:
-        st.session_state.current_model_state = {
-            "answering_model": None,
-            "embedding_model": None,
-            "routing_model": None,
-            "grading_model": None,
-        }
+    # Shortcut to session state
+    models = st.session_state.models
 
-    # Check if models or settings have changed
+    # Check if reinitialization is needed
     state_changed = (
-        st.session_state.current_model_state["answering_model"] != model_name or
-        st.session_state.current_model_state["embedding_model"] != selected_embedding_model or
-        st.session_state.current_model_state["routing_model"] != selected_routing_model or
-        st.session_state.current_model_state["grading_model"] != selected_grading_model
+        models.get("answering_model") != model_name or
+        models.get("embedding_model") != selected_embedding_model or
+        models.get("routing_model") != selected_routing_model or
+        models.get("grading_model") != selected_grading_model
     )
 
-    # Reinitialize components only if settings have changed
     if state_changed:
-        embed_model = initialize_embedding_model(selected_embedding_model)
-        # Update vectorstore
+        # Reinitialize components
+        models["embed_model"] = initialize_embedding_model(selected_embedding_model)
         persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
-        vectorstore = load_or_create_vs(persist_directory)
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        llm = initialize_llm(model_name, answer_style)
-        router_llm = initialize_router_llm(selected_routing_model)
-        grader_llm = initialize_grading_llm(selected_grading_model)
-        doc_grader = initialize_grader_chain()
+        models["vectorstore"] = load_or_create_vs(persist_directory, models["embed_model"])
+        models["retriever"] = models["vectorstore"].as_retriever(search_kwargs={"k": 5})
+        models["llm"] = initialize_llm(model_name, answer_style)
+        models["router_llm"] = initialize_router_llm(selected_routing_model)
+        models["grader_llm"] = initialize_grading_llm(selected_grading_model)
+        models["doc_grader"] = initialize_grader_chain(models["grader_llm"])
 
-        # Save updated state
-        st.session_state.current_model_state.update({
+        # Update session state
+        models.update({
             "answering_model": model_name,
             "embedding_model": selected_embedding_model,
             "routing_model": selected_routing_model,
             "grading_model": selected_grading_model,
         })
-        print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
 
-    return workflow.compile()
+    return workflow.compile(models)
+
 
 
 def initialize_llm(model_name, answer_style):
@@ -298,19 +291,22 @@ rag_prompt = PromptTemplate(
 
 )
 
-def initialize_grader_chain():
-    global grader_llm
-    # Data model for LLM output format
+def initialize_grader_chain(grader_llm):
+    """
+    Initialize the document grading chain using a session-specific grader LLM.
+    """
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from pydantic import BaseModel, Field
+
     class GradeDocuments(BaseModel):
         """Binary score for relevance check on retrieved documents."""
         binary_score: str = Field(
             description="Documents are relevant to the question, 'yes' or 'no'"
         )
 
-    # LLM for grading
     structured_llm_grader = grader_llm.with_structured_output(GradeDocuments)
 
-    # Prompt template for grading
     SYS_PROMPT = """You are an expert grader assessing relevance of a retrieved document to a user question.
                     Follow these instructions for grading:
                     - If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant.
@@ -322,16 +318,17 @@ def initialize_grader_chain():
             ("human", """Retrieved document:
                         {documents}
                         User question:
-                        {question}
-                    """),
+                        {question}"""),
         ]
     )
 
-    # Build grader chain
     return grade_prompt | structured_llm_grader
 
+
 def grade_documents(state):
-    global grader_llm
+    """
+    Grade retrieved documents for relevance to the user's question using a session-specific grader.
+    """
     question = state["question"]
     documents = state.get("documents", [])
     filtered_docs = []
@@ -339,21 +336,21 @@ def grade_documents(state):
     if not documents:
         print("No documents retrieved for grading.")
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
+
+    doc_grader = st.session_state.models["doc_grader"]
+    print(f"Grading retrieved documents with {st.session_state.models['grader_llm'].model_name}")
     
-    print(f"Grading retrieved documents with {grader_llm.model_name}")
     for count, doc in enumerate(documents):
         try:
-            # Evaluate document relevance
             score = doc_grader.invoke({"documents": [doc], "question": question})
             print(f"Chunk {count} relevance: {score}")
 
-            if score.binary_score == "Yes":  # Correctly check binary_score
+            if score.binary_score.lower() == "yes":
                 filtered_docs.append(doc)
         except Exception as e:
             print(f"Error grading document chunk {count}: {e}")
 
     web_search_needed = "Yes" if not filtered_docs else "No"
-
     return {"documents": filtered_docs, "question": question, "web_search_needed": web_search_needed}
 
 
@@ -375,6 +372,7 @@ class GraphState(TypedDict):
 def retrieve(state):
     print("Retrieving documents")
     question = state["question"]
+    retriever = st.session_state.models["retriever"]
     documents = retriever.invoke(question)
     return {"documents": documents, "question": question}
 
@@ -386,7 +384,7 @@ def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
     answer_style = state.get("answer_style", "Concise") 
-    global llm
+    llm = st.session_state.models["llm"]
     # Use current_llm instead of initializing a new one
     rag_chain = rag_prompt | llm | StrOutputParser()
 
@@ -598,34 +596,35 @@ def get_licensing_info(state):
 
 # # Router function
 def route_question(state):
-    global router_llm
+    """
+    Route the user's question to the appropriate tool or function using a session-specific router LLM.
+    """
     question = state["question"]
     hybrid_search_enabled = state.get("hybrid_search", False)
     internet_search_enabled = state.get("internet_search", False)
-    
+
     if hybrid_search_enabled:
         return "hybrid_search"
-    
+
     if internet_search_enabled:
         return "websearch"
 
     tool_selection = {
-        "get_tax_info": "question related to tax related information including current tax rates, taxation rules, taxable incomes, tax exemption, tax filing process, etc., but not asking information about any other country or city except Finland.",
-        "get_contact_tool": "question related to contact information of the Finnish Immigration Service, also known as Migri (but not asking information about any other country or city except Finland.)",
-        "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
-        "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
-        "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-        "retrieve": "All other question related to business, entrepreneurship, job and unemployment not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business, entrepreneurship, job and employment in Finland, or related to other countries instead of Finland."
+        "get_tax_info": "question related to tax-related information...",
+        "get_contact_tool": "question related to contact information...",
+        "get_registration_info": "question specifically related to the process of company registration...",
+        "get_licensing_info": "question related to licensing, permits, and notifications...",
+        "websearch": "questions related to residence permit, visa...",
+        "retrieve": "All other questions related to business and entrepreneurship...",
+        "unrelated": "Questions not related to business and entrepreneurship in Finland...",
     }
 
-    SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
-                 - Analyze the given question and use the given tool selection dictionary to output the name of the relevant tool based on its description and relevancy with the question. 
-                   The dictionary has tool names as keys and their descriptions as values. 
-                 - Output only and only tool name, i.e., the exact key and nothing else with no explanations at all. 
-                """
+    SYS_PROMPT = """Act as a router to select specific tools or functions based on the user's question.
+                 Analyze the given question and use the given tool selection dictionary to output the name of the relevant tool based on its description.
+                 Output only and only the tool name, i.e., the exact key and nothing else with no explanations at all."""
 
-    # Define the ChatPromptTemplate
+    router_llm = st.session_state.models["router_llm"]
+
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", SYS_PROMPT),
@@ -638,64 +637,57 @@ def route_question(state):
         ]
     )
 
-    # Pass the inputs to the prompt
-    inputs = {
-        "question": question,
-        "tool_selection": tool_selection
-    }
-
-    # Invoke the chain
+    inputs = {"question": question, "tool_selection": tool_selection}
     tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
-    tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
-    if not "unrelated" in tool:
-        print(f"Invoking {tool} tool through {router_llm.model_name}")
-    if "websearch" in tool:
-        print("I need to get recent information from this query.")
+    tool = tool.strip()
+    print(f"Routing decision: {tool} (Router LLM: {router_llm.model_name})")
     return tool
-workflow = StateGraph(GraphState)
 
-# Add nodes
-workflow.add_node("retrieve", retrieve)
-workflow.add_node("grade_documents", grade_documents)
-workflow.add_node("route_after_grading", route_after_grading)
-workflow.add_node("websearch", web_search)
-workflow.add_node("generate", generate)
-workflow.add_node("get_contact_tool", get_contact_tool)
-workflow.add_node("get_tax_info", get_tax_info)
-workflow.add_node("get_registration_info", get_registration_info)
-workflow.add_node("get_licensing_info", get_licensing_info)
-workflow.add_node("hybrid_search", hybrid_search)
-workflow.add_node("unrelated", handle_unrelated)
 
-# Set conditional entry points
-workflow.set_conditional_entry_point(
-    route_question,
-    {
-        "retrieve": "retrieve",
-        "websearch": "websearch",
-        "get_contact_tool": "get_contact_tool",
-        "get_tax_info": "get_tax_info",
-        "get_registration_info": "get_registration_info",
-        "get_licensing_info": "get_licensing_info",
-        "hybrid_search": "hybrid_search",
-        "unrelated": "unrelated"
-    },
-)
-
-# Add edges
-workflow.add_edge("retrieve", "grade_documents")
-workflow.add_conditional_edges(
-    "grade_documents",
-    route_after_grading,
-    {"websearch": "websearch", "generate": "generate"},
-)
-workflow.add_edge("websearch", "generate")
-workflow.add_edge("get_contact_tool", "generate")
-workflow.add_edge("get_tax_info", "generate")
-workflow.add_edge("get_registration_info", "generate")
-workflow.add_edge("get_licensing_info", "generate")
-workflow.add_edge("hybrid_search", "generate")
-workflow.add_edge("unrelated", "generate")
+if "workflow" not in st.session_state:
+    st.session_state.workflow = StateGraph(GraphState)
+    # Add nodes
+    st.session_state.workflow.add_node("retrieve", retrieve)
+    st.session_state.workflow.add_node("grade_documents", grade_documents)
+    st.session_state.workflow.add_node("route_after_grading", route_after_grading)
+    st.session_state.workflow.add_node("websearch", web_search)
+    st.session_state.workflow.add_node("generate", generate)
+    st.session_state.workflow.add_node("get_contact_tool", get_contact_tool)
+    st.session_state.workflow.add_node("get_tax_info", get_tax_info)
+    st.session_state.workflow.add_node("get_registration_info", get_registration_info)
+    st.session_state.workflow.add_node("get_licensing_info", get_licensing_info)
+    st.session_state.workflow.add_node("hybrid_search", hybrid_search)
+    st.session_state.workflow.add_node("unrelated", handle_unrelated)
+    
+    # Set conditional entry points
+    st.session_state.workflow.set_conditional_entry_point(
+        route_question,
+        {
+            "retrieve": "retrieve",
+            "websearch": "websearch",
+            "get_contact_tool": "get_contact_tool",
+            "get_tax_info": "get_tax_info",
+            "get_registration_info": "get_registration_info",
+            "get_licensing_info": "get_licensing_info",
+            "hybrid_search": "hybrid_search",
+            "unrelated": "unrelated"
+        },
+    )
+    
+    # Add edges
+    st.session_state.workflow.add_edge("retrieve", "grade_documents")
+    st.session_state.workflow.add_conditional_edges(
+        "grade_documents",
+        route_after_grading,
+        {"websearch": "websearch", "generate": "generate"},
+    )
+    st.session_state.workflow.add_edge("websearch", "generate")
+    st.session_state.workflow.add_edge("get_contact_tool", "generate")
+    st.session_state.workflow.add_edge("get_tax_info", "generate")
+    st.session_state.workflow.add_edge("get_registration_info", "generate")
+    st.session_state.workflow.add_edge("get_licensing_info", "generate")
+    st.session_state.workflow.add_edge("hybrid_search", "generate")
+    st.session_state.workflow.add_edge("unrelated", "generate")
 
 
 # Compile app
