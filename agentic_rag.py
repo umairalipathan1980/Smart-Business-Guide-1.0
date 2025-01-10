@@ -247,7 +247,7 @@ model_list = [
     ]
 rag_prompt = PromptTemplate(
     template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-                You are a highly accurate and trustworthy assistant specialized in answering questions related to business and entrepreneurship in Finland. 
+                You are a highly accurate and trustworthy assistant specialized in answering questions related to business, entrepreneurship, job, and employment in Finland. 
                 Your responses must strictly adhere to the provided context, answer style, using the follow these rules:
 
                 1. **Context-Only Answers with a given answer style**:
@@ -616,7 +616,7 @@ def route_question(state):
         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
         "retrieve": "All other question related to business and entrepreneurship not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business, entrepreneurship and job in Finland, or related to other countries instead of Finland."
+        "unrelated": "Questions not related to business, entrepreneurship, job and employment in Finland, or related to other countries instead of Finland."
     }
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
