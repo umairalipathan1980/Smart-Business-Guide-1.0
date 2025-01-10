@@ -181,7 +181,7 @@ else:
 # Global variable to store the current LLM
 llm = None
 #router_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0)
-router_llm = ChatOpenAI(model="gpt=4o",temperature=0.0)
+router_llm = ChatOpenAI(model="gpt-4o",temperature=0.0)
 def initialize_app(model_name, hybrid_search, internet_search, answer_style):
     global llm, doc_grader
     llm = initialize_llm(model_name, answer_style)
