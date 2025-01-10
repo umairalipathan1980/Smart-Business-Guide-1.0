@@ -158,7 +158,8 @@ def load_or_create_vs(persist_directory, embed_model):
 
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
-    Initialize session-specific embeddings, vectorstore, retriever, and LLM for the RAG workflow.
+    Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
+    Reinitialize components only if the selection has changed.
     """
     if "models" not in st.session_state:
         st.session_state.models = {}
@@ -193,7 +194,9 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
             "grading_model": selected_grading_model,
         })
 
-    return workflow.compile(models)
+    # Return the compiled workflow for the current session
+    return st.session_state.workflow.compile(models)
+
 
 
 
@@ -646,7 +649,8 @@ def route_question(state):
 
 if "workflow" not in st.session_state:
     st.session_state.workflow = StateGraph(GraphState)
-    # Add nodes
+
+    # Add session-specific nodes
     st.session_state.workflow.add_node("retrieve", retrieve)
     st.session_state.workflow.add_node("grade_documents", grade_documents)
     st.session_state.workflow.add_node("route_after_grading", route_after_grading)
@@ -658,8 +662,8 @@ if "workflow" not in st.session_state:
     st.session_state.workflow.add_node("get_licensing_info", get_licensing_info)
     st.session_state.workflow.add_node("hybrid_search", hybrid_search)
     st.session_state.workflow.add_node("unrelated", handle_unrelated)
-    
-    # Set conditional entry points
+
+    # Set entry points
     st.session_state.workflow.set_conditional_entry_point(
         route_question,
         {
@@ -670,10 +674,10 @@ if "workflow" not in st.session_state:
             "get_registration_info": "get_registration_info",
             "get_licensing_info": "get_licensing_info",
             "hybrid_search": "hybrid_search",
-            "unrelated": "unrelated"
+            "unrelated": "unrelated",
         },
     )
-    
+
     # Add edges
     st.session_state.workflow.add_edge("retrieve", "grade_documents")
     st.session_state.workflow.add_conditional_edges(
@@ -688,6 +692,7 @@ if "workflow" not in st.session_state:
     st.session_state.workflow.add_edge("get_licensing_info", "generate")
     st.session_state.workflow.add_edge("hybrid_search", "generate")
     st.session_state.workflow.add_edge("unrelated", "generate")
+
 
 
 # Compile app
