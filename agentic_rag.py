@@ -132,7 +132,7 @@ def staticChunker(folder_path):
             docs.extend(chunked_docs)
     return docs
 
-def load_or_create_vs(persist_directory):
+def load_or_create_vs(persist_directory, embed_model):
     # Check if the vector store directory exists
     if os.path.exists(persist_directory):
         print("Loading existing vector store...")
