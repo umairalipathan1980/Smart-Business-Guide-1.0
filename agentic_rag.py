@@ -615,7 +615,7 @@ def route_question(state):
         "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-        "retrieve": "All other question related to business and entrepreneurship not covered by the other tools, but not asking information about any other country or city except Finland.)",
+        "retrieve": "All other question related to business, entrepreneurship, job and unemployment not covered by the other tools, but not asking information about any other country or city except Finland.)",
         "unrelated": "Questions not related to business, entrepreneurship, job and employment in Finland, or related to other countries instead of Finland."
     }
 
