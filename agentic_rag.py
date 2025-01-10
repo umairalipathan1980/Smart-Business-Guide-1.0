@@ -228,14 +228,26 @@ def initialize_llm(model_name, answer_style):
     return st.session_state.llm
 
 
+# def initialize_embedding_model(selected_embedding_model):
+#     if "embed_model" not in st.session_state or st.session_state.embed_model.model != selected_embedding_model:
+#         if "text-" in selected_embedding_model:
+#             st.session_state.embed_model = OpenAIEmbeddings(model=selected_embedding_model)
+#         else:
+#             st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
+    
+#     return st.session_state.embed_model
+
 def initialize_embedding_model(selected_embedding_model):
-    if "embed_model" not in st.session_state or st.session_state.embed_model.model != selected_embedding_model:
+    if "embed_model" not in st.session_state or not hasattr(st.session_state.embed_model, 'model_identifier') or st.session_state.embed_model.model_identifier != selected_embedding_model:
         if "text-" in selected_embedding_model:
             st.session_state.embed_model = OpenAIEmbeddings(model=selected_embedding_model)
+            st.session_state.embed_model.model_identifier = selected_embedding_model
         else:
             st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
+            st.session_state.embed_model.model_identifier = selected_embedding_model
     
     return st.session_state.embed_model
+
 
 #@st.cache_resource
 def initialize_router_llm(selected_routing_model):
