@@ -70,8 +70,8 @@ DATA_FOLDER = 'data'
 persist_directory_openai = 'data/chroma_db_llamaparse-openai'
 persist_directory_huggingface = 'data/chroma_db_llamaparse-huggincface'
 collection_name = 'rag'
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 150
+CHUNK_SIZE = 3000
+CHUNK_OVERLAP = 200
 
 def remove_tags(soup):
     # Remove unwanted tags
