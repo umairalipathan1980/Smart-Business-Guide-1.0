@@ -229,13 +229,27 @@ def initialize_llm(model_name, answer_style):
 
 
 def initialize_embedding_model(selected_embedding_model):
-    if "embed_model" not in st.session_state or st.session_state.embed_model.model != selected_embedding_model:
+    # Check if the embed_model exists in session_state
+    if "embed_model" not in st.session_state:
+        st.session_state.embed_model = None
+
+    # Check if the current model matches the selected one
+    current_model_name = None
+    if st.session_state.embed_model:
+        if hasattr(st.session_state.embed_model, "model"):
+            current_model_name = st.session_state.embed_model.model
+        elif hasattr(st.session_state.embed_model, "model_name"):
+            current_model_name = st.session_state.embed_model.model_name
+
+    # Initialize a new model if it doesn't match the selected one
+    if current_model_name != selected_embedding_model:
         if "text-" in selected_embedding_model:
             st.session_state.embed_model = OpenAIEmbeddings(model=selected_embedding_model)
         else:
             st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
-    
+
     return st.session_state.embed_model
+
 
 
 #@st.cache_resource
