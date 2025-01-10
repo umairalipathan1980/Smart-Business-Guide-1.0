@@ -43,9 +43,7 @@ from bs4 import BeautifulSoup
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-
-
-
+from langchain_openai import OpenAIEmbeddings
 
 ########################Resolve or suppress warnings
 # Set global logging level to ERROR
@@ -69,7 +67,8 @@ logging.basicConfig(level=logging.INFO)
 # Define paths and parameters
 data_file_path = 'Becoming an entrepreneur in Finland.md'
 DATA_FOLDER = 'data'
-persist_directory = 'data/chroma_db_llamaparse'
+persist_directory_openai = 'data/chroma_db_llamaparse-openai'
+persist_directory_huggingface = 'data/chroma_db_llamaparse-huggincface'
 collection_name = 'rag'
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
@@ -131,7 +130,6 @@ def staticChunker(folder_path):
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
             chunked_docs = text_splitter.split_documents(documents)
             docs.extend(chunked_docs)
-
     return docs
 
 def load_or_create_vs(persist_directory):
@@ -158,42 +156,34 @@ def load_or_create_vs(persist_directory):
         print('Vector store created and persisted successfully!')
     return vectorstore
 
-# Initialize the embedding model
-embed_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
+    """
+    Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
+    """
+    global llm, doc_grader, embed_model, vectorstore, retriever, router_llm, grader_llm
 
-# Initialize the retriever
-vectorstore = load_or_create_vs(persist_directory)
-retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-if retriever:
-    print("Retriever initialized.")
-else:
-    print("Failed initializing a retriever")
-    sys.exit(1)
+    # Use the selected_embedding_model from app.py
+    embed_model = initialize_embedding_model(selected_embedding_model)
+    # Re-create or load the vectorstore with the new embed_model
+    if "text-" in selected_embedding_model:
+        persist_directory = persist_directory_openai
+    else:
+        persist_directory = persist_directory_huggingface
+    vectorstore = load_or_create_vs(persist_directory)
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    if retriever:
+        print("Retriever initialized.")
+    else:
+        print("Failed to initialize the retriever.")
+        sys.exit(1)
 
-
-
-# model = "llama3-70b-8192"
-# if "gpt-" in model:
-#     llm = ChatOpenAI(model = model, temperature = 0.0)
-# else:
-#     llm = ChatGroq(model= model, temperature = 0.0)
-
-# Global variable to store the current LLM
-llm = None
-#router_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0)
-router_llm = ChatOpenAI(model="gpt-4o",temperature=0.0)
-def initialize_app(model_name, hybrid_search, internet_search, answer_style):
-    global llm, doc_grader
+    # (re) Initialize the LLM & doc_grader
     llm = initialize_llm(model_name, answer_style)
+    router_llm = initialize_router_llm(selected_routing_model)
+    grader_llm = initialize_grading_llm(selected_grading_model)
     doc_grader = initialize_grader_chain()
+    print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
     return workflow.compile()
-
-
-# def update_llm(model_name):
-#     global llm, doc_grader
-#     llm = initialize_llm(model_name, answer_style)
-#     doc_grader = initialize_grader_chain()
-#     # Update rag_chain and other components that use the LLM
 
 def initialize_llm(model_name, answer_style):
     if answer_style == "Concise":
@@ -207,6 +197,25 @@ def initialize_llm(model_name, answer_style):
     else:
         return ChatGroq(model=model_name, temperature=temperature)
 
+def initialize_embedding_model(selected_embedding_model):
+    if "text-" in selected_embedding_model:
+        embed_model = OpenAIEmbeddings(model = selected_embedding_model)
+    else:
+        embed_model = HuggingFaceEmbeddings(model_name = selected_embedding_model)
+    return embed_model
+
+def initialize_router_llm(selected_routing_model):
+    if "gpt-" in selected_routing_model:
+        return ChatOpenAI(model=selected_routing_model, temperature=0.0)
+    else:
+        return ChatGroq(model=selected_routing_model, temperature=0.0)
+
+def initialize_grading_llm(selected_grading_model):
+    if "gpt-" in selected_grading_model:
+        return ChatOpenAI(model=selected_grading_model, temperature=0.0)
+    else:
+        return ChatGroq(model=selected_grading_model, temperature=0.0)
+
 model_list = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
@@ -217,57 +226,6 @@ model_list = [
     "gpt-4o-mini",
     "gpt-4o"
     ]
-
-###Prompt for RAG generation
-# rag_prompt = PromptTemplate(
-#     template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-#                 You are a highly accurate and trustworthy assistant specialized in answering questions related to business and entrepreneurship in Finland. 
-#                 Your responses must strictly adhere to the provided context and follow these rules:
-
-#                 1. **Context-Only Answers**:
-#                 - Always base your answers solely on the provided context.
-#                 - If the context does not contain relevant information, respond with: 'No information found.'
-#                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
-
-#                 2. **Precise and Concise Responses**:
-#                 - Address the query directly without unnecessary elaboration or speculative information.
-#                 - Do not draw from your knowledge base; strictly use the given context.
-
-#                 3. **Conversational tone**
-#                  - Maintain a conversational but professional tone. 
-#                  - Use simple language. Explain difficult concepts or terms wherever needed.
-
-#                 4. **Formatting Guidelines**:
-#                 - Use bullet points for lists.
-#                 - Include line breaks between sections for clarity.
-#                 - Highlight important numbers, dates, and terms using **bold** formatting.
-#                 - Create tables wherever appropriate to present data clearly.
-#                 - If there are discrepancies in the context, clearly explain them.
-
-#                 5. **Citation Rules**:
-#                 - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: (document_name, page xx).
-#                 - If a single citation for multiple pieces of information is more practical, use the format: (Source: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...]).
-#                 - For responses derived from websearch results, include all the URLs returned by the websearch, each on a new line.
-#                 - **Citations and URLs must be included only when you are fully confident of their accuracy.** Do not fabricate citations or URLs.
-
-#                 6. **Hybrid Context Handling**:
-#                 - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
-#                     - **Smart guide results**: Include data from vectorstore retrieval and its citations in the format: (document_name, page xx).
-#                     - **Internet search results**: Include data from websearch and its citations (URLs). This does not mean only internet URLs, but all the data in 'Internet search results:' along with URLs.
-#                     - Do not combine the data in the two sections. Create two separate sections. 
-
-#                 7. **Integrity and Trustworthiness**:
-#                 - Never provide information that is not explicitly found in the context.
-#                 - Ensure every part of your response complies with these rules.
-
-#                 <|eot_id|><|start_header_id|>user<|end_header_id|>
-#                 Question: {question} 
-#                 Context: {context} 
-#                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-#                 input_variables=["question", "context"]
-
-# )
-
 rag_prompt = PromptTemplate(
     template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
                 You are a highly accurate and trustworthy assistant specialized in answering questions related to business and entrepreneurship in Finland. 
@@ -322,6 +280,7 @@ rag_prompt = PromptTemplate(
 )
 
 def initialize_grader_chain():
+    global grader_llm
     # Data model for LLM output format
     class GradeDocuments(BaseModel):
         """Binary score for relevance check on retrieved documents."""
@@ -330,7 +289,7 @@ def initialize_grader_chain():
         )
 
     # LLM for grading
-    structured_llm_grader = llm.with_structured_output(GradeDocuments)
+    structured_llm_grader = grader_llm.with_structured_output(GradeDocuments)
 
     # Prompt template for grading
     SYS_PROMPT = """You are an expert grader assessing relevance of a retrieved document to a user question.
@@ -353,6 +312,7 @@ def initialize_grader_chain():
     return grade_prompt | structured_llm_grader
 
 def grade_documents(state):
+    global grader_llm
     question = state["question"]
     documents = state.get("documents", [])
     filtered_docs = []
@@ -361,7 +321,7 @@ def grade_documents(state):
         print("No documents retrieved for grading.")
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
     
-    print(f"Grading retrieved documents with {llm.model_name}")
+    print(f"Grading retrieved documents with {grader_llm.model_name}")
     for count, doc in enumerate(documents):
         try:
             # Evaluate document relevance
@@ -385,21 +345,6 @@ def route_after_grading(state):
         return "websearch"
     else:
         return "generate"
-
-
-# qa = RetrievalQA.from_chain_type(
-#     llm=llm,
-#     chain_type="stuff",
-#     retriever=retriever,
-#     return_source_documents=True,
-#     chain_type_kwargs={"prompt": rag_prompt, "verbose": False},
-# )
-# if qa:
-#     print("Query engine initialized.")
-# else:
-#     print("Failed to initialize query engine.")
-#     sys.exit(1)
-
 # Define graph state class
 class GraphState(TypedDict):
     question: str
@@ -407,15 +352,6 @@ class GraphState(TypedDict):
     web_search_needed: str
     documents: List[Document]
     answer_style: str
-
-# Define nodes
-
-# def retrieve(state):
-#     question = state["question"]
-#     documents = retriever.invoke(question)
-#     if not documents:
-#         print("No documents retrieved.")
-#     return {"documents": documents, "question": question}
 
 def retrieve(state):
     print("Retrieving documents")
@@ -499,8 +435,6 @@ def handle_unrelated(state):
     documents.append(Document(page_content=response))
     return {"generation": response, "documents": documents, "question": question}
 
-
-
 def hybrid_search(state):
     question = state["question"]
     print("Invoking retriever...")
@@ -513,8 +447,6 @@ def hybrid_search(state):
     
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
-
-
 
 def web_search(state):
     question = state["question"]
@@ -542,8 +474,6 @@ def web_search(state):
         # Ensure workflow can continue gracefully
         documents.append(Document(page_content=f"Web search failed: {e}"))
     return {"documents": documents, "question": question}
-
-
 
 def get_contact_tool(state):
     """
@@ -649,6 +579,7 @@ def get_licensing_info(state):
 
 # # Router function
 def route_question(state):
+    global router_llm
     question = state["question"]
     hybrid_search_enabled = state.get("hybrid_search", False)
     internet_search_enabled = state.get("internet_search", False)
@@ -702,8 +633,6 @@ def route_question(state):
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
-
-
 workflow = StateGraph(GraphState)
 
 # Add nodes
@@ -752,7 +681,6 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
-
 
 
 
