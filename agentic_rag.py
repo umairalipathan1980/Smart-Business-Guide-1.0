@@ -159,31 +159,50 @@ def load_or_create_vs(persist_directory):
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
+    Reinitialize components only if the selection has changed.
     """
     global llm, doc_grader, embed_model, vectorstore, retriever, router_llm, grader_llm
 
-    # Use the selected_embedding_model from app.py
-    embed_model = initialize_embedding_model(selected_embedding_model)
-    # Re-create or load the vectorstore with the new embed_model
-    if "text-" in selected_embedding_model:
-        persist_directory = persist_directory_openai
-    else:
-        persist_directory = persist_directory_huggingface
-    vectorstore = load_or_create_vs(persist_directory)
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    if retriever:
-        print("Retriever initialized.")
-    else:
-        print("Failed to initialize the retriever.")
-        sys.exit(1)
+    # Track current state to prevent redundant initialization
+    if "current_model_state" not in st.session_state:
+        st.session_state.current_model_state = {
+            "answering_model": None,
+            "embedding_model": None,
+            "routing_model": None,
+            "grading_model": None,
+        }
 
-    # (re) Initialize the LLM & doc_grader
-    llm = initialize_llm(model_name, answer_style)
-    router_llm = initialize_router_llm(selected_routing_model)
-    grader_llm = initialize_grading_llm(selected_grading_model)
-    doc_grader = initialize_grader_chain()
-    print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
+    # Check if models or settings have changed
+    state_changed = (
+        st.session_state.current_model_state["answering_model"] != model_name or
+        st.session_state.current_model_state["embedding_model"] != selected_embedding_model or
+        st.session_state.current_model_state["routing_model"] != selected_routing_model or
+        st.session_state.current_model_state["grading_model"] != selected_grading_model
+    )
+
+    # Reinitialize components only if settings have changed
+    if state_changed:
+        embed_model = initialize_embedding_model(selected_embedding_model)
+        # Update vectorstore
+        persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
+        vectorstore = load_or_create_vs(persist_directory)
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        llm = initialize_llm(model_name, answer_style)
+        router_llm = initialize_router_llm(selected_routing_model)
+        grader_llm = initialize_grading_llm(selected_grading_model)
+        doc_grader = initialize_grader_chain()
+
+        # Save updated state
+        st.session_state.current_model_state.update({
+            "answering_model": model_name,
+            "embedding_model": selected_embedding_model,
+            "routing_model": selected_routing_model,
+            "grading_model": selected_grading_model,
+        })
+        print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
+
     return workflow.compile()
+
 
 def initialize_llm(model_name, answer_style):
     if answer_style == "Concise":
