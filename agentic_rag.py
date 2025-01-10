@@ -277,7 +277,7 @@ rag_prompt = PromptTemplate(
                 - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: (document_name, page xx).
                 - If a single citation for multiple pieces of information is more practical, use the format: (Source: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...]).
                 - For responses derived from websearch results, include all the URLs returned by the websearch, each on a new line.
-                - Do not fabricate citations or URLs.
+                - **Citations and URLs must be included only when you are fully confident of their accuracy.** Do not fabricate citations or URLs.
 
                 6. **Hybrid Context Handling**:
                 - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
@@ -615,8 +615,8 @@ def route_question(state):
         "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-        "retrieve": "All other question related to business, entrepreneurship, job and unemployment not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business, entrepreneurship, job and unemployment in Finland, or related to other countries instead of Finland."
+        "retrieve": "All other question related to business and entrepreneurship not covered by the other tools, but not asking information about any other country or city except Finland.)",
+        "unrelated": "Questions not related to business and entrepreneurship in Finland, or related to other countries instead of Finland."
     }
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
