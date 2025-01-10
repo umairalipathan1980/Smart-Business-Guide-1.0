@@ -277,7 +277,7 @@ rag_prompt = PromptTemplate(
                 - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: (document_name, page xx).
                 - If a single citation for multiple pieces of information is more practical, use the format: (Source: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...]).
                 - For responses derived from websearch results, include all the URLs returned by the websearch, each on a new line.
-                - **Citations and URLs must be included only when you are fully confident of their accuracy.** Do not fabricate citations or URLs.
+                - Do not fabricate citations or URLs.
 
                 6. **Hybrid Context Handling**:
                 - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
