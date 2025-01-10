@@ -36,13 +36,13 @@ with st.sidebar:
         st.session_state.selected_model = "gpt-4o"
 
     if "selected_routing_model" not in st.session_state:
-        st.session_state.selected_routing_model = "gpt-4o"
+        st.session_state.selected_routing_model = "llama-3.1-8b-instant"
 
     if "selected_grading_model" not in st.session_state:
-        st.session_state.selected_grading_model = "gpt-4o"
+        st.session_state.selected_grading_model = "llama-3.1-8b-instant"
 
     if "selected_embedding_model" not in st.session_state:
-        st.session_state.selected_embedding_model = "text-embedding-3-large"
+        st.session_state.selected_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
 
     model_list = [
         "llama-3.1-8b-instant",
