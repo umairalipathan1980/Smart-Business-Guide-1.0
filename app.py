@@ -109,9 +109,9 @@ with st.sidebar:
     
     reset_button = st.button("🔄 Reset Conversation", key="reset_button")
 
-    if st.button('Clear All Cache'):
-        st.cache_data.clear()
-        st.success('All cache cleared successfully!')
+    # if st.button('Clear All Cache'):
+    #     st.cache_data.clear()
+    #     st.success('All cache cleared successfully!')
 
     # Initialize the app with the selected model
     app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
