@@ -647,7 +647,7 @@ def route_question(state):
         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
         "retrieve": "All other question related to business, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business, entrepreneurship, job and unemployment in Finland, or related to other countries instead of Finland."
+        "unrelated": "Questions not related to business, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc in Finland, or related to other countries instead of Finland."
     }
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
