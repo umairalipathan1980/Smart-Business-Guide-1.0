@@ -33,7 +33,7 @@ with st.sidebar:
 
     # Initialize session state for the model if it doesn't exist
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = "gpt-4o"
+        st.session_state.selected_model = "llama-3.1-8b-instant"
 
     if "selected_routing_model" not in st.session_state:
         st.session_state.selected_routing_model = "llama-3.1-8b-instant"
