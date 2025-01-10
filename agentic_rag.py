@@ -161,13 +161,58 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
     Reinitialize components only if the selection has changed.
     """
+    # Initialize workflow if not already set
+    if "workflow" not in st.session_state:
+        st.session_state.workflow = StateGraph(GraphState)
+
+        # Add nodes
+        st.session_state.workflow.add_node("retrieve", retrieve)
+        st.session_state.workflow.add_node("grade_documents", grade_documents)
+        st.session_state.workflow.add_node("route_after_grading", route_after_grading)
+        st.session_state.workflow.add_node("websearch", web_search)
+        st.session_state.workflow.add_node("generate", generate)
+        st.session_state.workflow.add_node("get_contact_tool", get_contact_tool)
+        st.session_state.workflow.add_node("get_tax_info", get_tax_info)
+        st.session_state.workflow.add_node("get_registration_info", get_registration_info)
+        st.session_state.workflow.add_node("get_licensing_info", get_licensing_info)
+        st.session_state.workflow.add_node("hybrid_search", hybrid_search)
+        st.session_state.workflow.add_node("unrelated", handle_unrelated)
+
+        # Set entry points
+        st.session_state.workflow.set_conditional_entry_point(
+            route_question,
+            {
+                "retrieve": "retrieve",
+                "websearch": "websearch",
+                "get_contact_tool": "get_contact_tool",
+                "get_tax_info": "get_tax_info",
+                "get_registration_info": "get_registration_info",
+                "get_licensing_info": "get_licensing_info",
+                "hybrid_search": "hybrid_search",
+                "unrelated": "unrelated",
+            },
+        )
+
+        # Add edges
+        st.session_state.workflow.add_edge("retrieve", "grade_documents")
+        st.session_state.workflow.add_conditional_edges(
+            "grade_documents",
+            route_after_grading,
+            {"websearch": "websearch", "generate": "generate"},
+        )
+        st.session_state.workflow.add_edge("websearch", "generate")
+        st.session_state.workflow.add_edge("get_contact_tool", "generate")
+        st.session_state.workflow.add_edge("get_tax_info", "generate")
+        st.session_state.workflow.add_edge("get_registration_info", "generate")
+        st.session_state.workflow.add_edge("get_licensing_info", "generate")
+        st.session_state.workflow.add_edge("hybrid_search", "generate")
+        st.session_state.workflow.add_edge("unrelated", "generate")
+
+    # Ensure models are initialized
     if "models" not in st.session_state:
         st.session_state.models = {}
 
-    # Shortcut to session state
     models = st.session_state.models
-
-    # Check if reinitialization is needed
     state_changed = (
         models.get("answering_model") != model_name or
         models.get("embedding_model") != selected_embedding_model or
@@ -176,7 +221,6 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
     )
 
     if state_changed:
-        # Reinitialize components
         models["embed_model"] = initialize_embedding_model(selected_embedding_model)
         persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
         models["vectorstore"] = load_or_create_vs(persist_directory, models["embed_model"])
@@ -186,7 +230,6 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
         models["grader_llm"] = initialize_grading_llm(selected_grading_model)
         models["doc_grader"] = initialize_grader_chain(models["grader_llm"])
 
-        # Update session state
         models.update({
             "answering_model": model_name,
             "embedding_model": selected_embedding_model,
@@ -194,8 +237,9 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
             "grading_model": selected_grading_model,
         })
 
-    # Return the compiled workflow for the current session
+    # Compile the workflow for the session
     return st.session_state.workflow.compile(models)
+
 
 
 
@@ -645,55 +689,6 @@ def route_question(state):
     tool = tool.strip()
     print(f"Routing decision: {tool} (Router LLM: {router_llm.model_name})")
     return tool
-
-
-if "workflow" not in st.session_state:
-    st.session_state.workflow = StateGraph(GraphState)
-
-    # Add session-specific nodes
-    st.session_state.workflow.add_node("retrieve", retrieve)
-    st.session_state.workflow.add_node("grade_documents", grade_documents)
-    st.session_state.workflow.add_node("route_after_grading", route_after_grading)
-    st.session_state.workflow.add_node("websearch", web_search)
-    st.session_state.workflow.add_node("generate", generate)
-    st.session_state.workflow.add_node("get_contact_tool", get_contact_tool)
-    st.session_state.workflow.add_node("get_tax_info", get_tax_info)
-    st.session_state.workflow.add_node("get_registration_info", get_registration_info)
-    st.session_state.workflow.add_node("get_licensing_info", get_licensing_info)
-    st.session_state.workflow.add_node("hybrid_search", hybrid_search)
-    st.session_state.workflow.add_node("unrelated", handle_unrelated)
-
-    # Set entry points
-    st.session_state.workflow.set_conditional_entry_point(
-        route_question,
-        {
-            "retrieve": "retrieve",
-            "websearch": "websearch",
-            "get_contact_tool": "get_contact_tool",
-            "get_tax_info": "get_tax_info",
-            "get_registration_info": "get_registration_info",
-            "get_licensing_info": "get_licensing_info",
-            "hybrid_search": "hybrid_search",
-            "unrelated": "unrelated",
-        },
-    )
-
-    # Add edges
-    st.session_state.workflow.add_edge("retrieve", "grade_documents")
-    st.session_state.workflow.add_conditional_edges(
-        "grade_documents",
-        route_after_grading,
-        {"websearch": "websearch", "generate": "generate"},
-    )
-    st.session_state.workflow.add_edge("websearch", "generate")
-    st.session_state.workflow.add_edge("get_contact_tool", "generate")
-    st.session_state.workflow.add_edge("get_tax_info", "generate")
-    st.session_state.workflow.add_edge("get_registration_info", "generate")
-    st.session_state.workflow.add_edge("get_licensing_info", "generate")
-    st.session_state.workflow.add_edge("hybrid_search", "generate")
-    st.session_state.workflow.add_edge("unrelated", "generate")
-
-
 
 # Compile app
 app = st.session_state.workflow.compile()
