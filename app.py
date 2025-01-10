@@ -42,7 +42,7 @@ with st.sidebar:
         st.session_state.selected_grading_model = "gpt-4o"
 
     if "selected_embedding_model" not in st.session_state:
-        st.session_state.selected_embedding_model = "gpt-4o"
+        st.session_state.selected_embedding_model = "text-embedding-3-large"
 
     model_list = [
         "llama-3.1-8b-instant",
