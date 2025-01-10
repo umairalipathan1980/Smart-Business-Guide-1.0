@@ -72,7 +72,6 @@ persist_directory_huggingface = 'data/chroma_db_llamaparse-huggincface'
 collection_name = 'rag'
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
-tavily_client = TavilyClient()
 
 def remove_tags(soup):
     # Remove unwanted tags
@@ -91,6 +90,8 @@ def remove_tags(soup):
         elif element.name == 'li':
             content += '- ' + text + '\n'
     return content
+
+@st.cache_data
 def get_info(URLs):
     """
     Fetch and return contact information from predefined URLs.
@@ -108,6 +109,7 @@ def get_info(URLs):
             combined_info += f"Error fetching URL {url}: {e}\n\n"
     return combined_info
 
+@st.cache_data
 def staticChunker(folder_path):
     docs = []
     print(f"Creating chunks. CHUNK_SIZE: {CHUNK_SIZE}, CHUNK_OVERLAP: {CHUNK_OVERLAP}")
@@ -132,6 +134,7 @@ def staticChunker(folder_path):
             docs.extend(chunked_docs)
     return docs
 
+@st.cache_resource
 def load_or_create_vs(persist_directory):
     # Check if the vector store directory exists
     if os.path.exists(persist_directory):
@@ -139,7 +142,7 @@ def load_or_create_vs(persist_directory):
         # Load the existing vector store
         vectorstore = Chroma(
             persist_directory=persist_directory,
-            embedding_function=embed_model,
+            embedding_function=st.session_state.embed_model,
             collection_name=collection_name
         )
     else:
@@ -149,20 +152,21 @@ def load_or_create_vs(persist_directory):
         # Create and persist a new Chroma vector store
         vectorstore = Chroma.from_documents(
             documents=docs,
-            embedding=embed_model,
+            embedding=st.session_state.embed_model,
             persist_directory=persist_directory,
             collection_name=collection_name
         )
         print('Vector store created and persisted successfully!')
+
     return vectorstore
+
+
 
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
     Reinitialize components only if the selection has changed.
     """
-    global llm, doc_grader, embed_model, vectorstore, retriever, router_llm, grader_llm
-
     # Track current state to prevent redundant initialization
     if "current_model_state" not in st.session_state:
         st.session_state.current_model_state = {
@@ -182,15 +186,17 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
 
     # Reinitialize components only if settings have changed
     if state_changed:
-        embed_model = initialize_embedding_model(selected_embedding_model)
+        st.session_state.embed_model = initialize_embedding_model(selected_embedding_model)
+        
         # Update vectorstore
         persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
-        vectorstore = load_or_create_vs(persist_directory)
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        llm = initialize_llm(model_name, answer_style)
-        router_llm = initialize_router_llm(selected_routing_model)
-        grader_llm = initialize_grading_llm(selected_grading_model)
-        doc_grader = initialize_grader_chain()
+        st.session_state.vectorstore = load_or_create_vs(persist_directory)
+        st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
+        
+        st.session_state.llm = initialize_llm(model_name, answer_style)
+        st.session_state.router_llm = initialize_router_llm(selected_routing_model)
+        st.session_state.grader_llm = initialize_grading_llm(selected_grading_model)
+        st.session_state.doc_grader = initialize_grader_chain()
 
         # Save updated state
         st.session_state.current_model_state.update({
@@ -199,41 +205,58 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
             "routing_model": selected_routing_model,
             "grading_model": selected_grading_model,
         })
-        print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
+
+    print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
 
     return workflow.compile()
 
-
+@st.cache_resource
 def initialize_llm(model_name, answer_style):
-    if answer_style == "Concise":
-        temperature = 0.0
-    elif answer_style == "Moderate":
-        temperature = 0.2
-    elif answer_style == "Explanatory":
-        temperature = 0.4
-    if "gpt-" in model_name:
-        return ChatOpenAI(model=model_name, temperature=temperature)
-    else:
-        return ChatGroq(model=model_name, temperature=temperature)
+    if "llm" not in st.session_state or st.session_state.llm.model_name != model_name:
+        if answer_style == "Concise":
+            temperature = 0.0
+        elif answer_style == "Moderate":
+            temperature = 0.2
+        elif answer_style == "Explanatory":
+            temperature = 0.4
+
+        if "gpt-" in model_name:
+            st.session_state.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        else:
+            st.session_state.llm = ChatGroq(model=model_name, temperature=temperature)
+
+    return st.session_state.llm
+
 
 def initialize_embedding_model(selected_embedding_model):
-    if "text-" in selected_embedding_model:
-        embed_model = OpenAIEmbeddings(model = selected_embedding_model)
-    else:
-        embed_model = HuggingFaceEmbeddings(model_name = selected_embedding_model)
-    return embed_model
+    if "embed_model" not in st.session_state or st.session_state.embed_model.model != selected_embedding_model:
+        if "text-" in selected_embedding_model:
+            st.session_state.embed_model = OpenAIEmbeddings(model=selected_embedding_model)
+        else:
+            st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
+    
+    return st.session_state.embed_model
 
+@st.cache_resource
 def initialize_router_llm(selected_routing_model):
-    if "gpt-" in selected_routing_model:
-        return ChatOpenAI(model=selected_routing_model, temperature=0.0)
-    else:
-        return ChatGroq(model=selected_routing_model, temperature=0.0)
+    if "router_llm" not in st.session_state or st.session_state.router_llm.model_name != selected_routing_model:
+        if "gpt-" in selected_routing_model:
+            st.session_state.router_llm = ChatOpenAI(model=selected_routing_model, temperature=0.0)
+        else:
+            st.session_state.router_llm = ChatGroq(model=selected_routing_model, temperature=0.0)
+    
+    return st.session_state.router_llm
 
+@st.cache_resource
 def initialize_grading_llm(selected_grading_model):
-    if "gpt-" in selected_grading_model:
-        return ChatOpenAI(model=selected_grading_model, temperature=0.0)
-    else:
-        return ChatGroq(model=selected_grading_model, temperature=0.0)
+    if "grader_llm" not in st.session_state or st.session_state.grader_llm.model_name != selected_grading_model:
+        if "gpt-" in selected_grading_model:
+            st.session_state.grader_llm = ChatOpenAI(model=selected_grading_model, temperature=0.0)
+        else:
+            st.session_state.grader_llm = ChatGroq(model=selected_grading_model, temperature=0.0)
+    
+    return st.session_state.grader_llm
+
 
 model_list = [
     "llama-3.1-8b-instant",
@@ -277,7 +300,7 @@ rag_prompt = PromptTemplate(
                 - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: (document_name, page xx).
                 - If a single citation for multiple pieces of information is more practical, use the format: (Source: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...]).
                 - For responses derived from websearch results, include all the URLs returned by the websearch, each on a new line.
-                - **Citations and URLs must be included only when you are fully confident of their accuracy.** Do not fabricate citations or URLs.
+                - Do not fabricate citations or URLs.
 
                 6. **Hybrid Context Handling**:
                 - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
@@ -299,7 +322,6 @@ rag_prompt = PromptTemplate(
 )
 
 def initialize_grader_chain():
-    global grader_llm
     # Data model for LLM output format
     class GradeDocuments(BaseModel):
         """Binary score for relevance check on retrieved documents."""
@@ -308,30 +330,29 @@ def initialize_grader_chain():
         )
 
     # LLM for grading
-    structured_llm_grader = grader_llm.with_structured_output(GradeDocuments)
+    structured_llm_grader = st.session_state.grader_llm.with_structured_output(GradeDocuments)
 
     # Prompt template for grading
     SYS_PROMPT = """You are an expert grader assessing relevance of a retrieved document to a user question.
-                    Follow these instructions for grading:
-                    - If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant.
-                    - Your grade should be either 'Yes' or 'No' to indicate whether the document is relevant to the question or not."""
 
-    grade_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", SYS_PROMPT),
-            ("human", """Retrieved document:
-                        {documents}
-                        User question:
-                        {question}
-                    """),
-        ]
-    )
+    Follow these instructions for grading:
+    - If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant.
+    - Your grade should be either 'Yes' or 'No' to indicate whether the document is relevant to the question or not."""
+
+    grade_prompt = ChatPromptTemplate.from_messages([
+        ("system", SYS_PROMPT),
+        ("human", """Retrieved document:
+    {documents}
+    User question:
+    {question}
+    """),
+    ])
 
     # Build grader chain
     return grade_prompt | structured_llm_grader
 
+
 def grade_documents(state):
-    global grader_llm
     question = state["question"]
     documents = state.get("documents", [])
     filtered_docs = []
@@ -339,22 +360,22 @@ def grade_documents(state):
     if not documents:
         print("No documents retrieved for grading.")
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
-    
-    print(f"Grading retrieved documents with {grader_llm.model_name}")
+
+    print(f"Grading retrieved documents with {st.session_state.grader_llm.model_name}")
+
     for count, doc in enumerate(documents):
         try:
             # Evaluate document relevance
-            score = doc_grader.invoke({"documents": [doc], "question": question})
+            score = st.session_state.doc_grader.invoke({"documents": [doc], "question": question})
             print(f"Chunk {count} relevance: {score}")
-
-            if score.binary_score == "Yes":  # Correctly check binary_score
+            if score.binary_score == "Yes":
                 filtered_docs.append(doc)
         except Exception as e:
             print(f"Error grading document chunk {count}: {e}")
 
     web_search_needed = "Yes" if not filtered_docs else "No"
-
     return {"documents": filtered_docs, "question": question, "web_search_needed": web_search_needed}
+
 
 
 def route_after_grading(state):
@@ -375,7 +396,7 @@ class GraphState(TypedDict):
 def retrieve(state):
     print("Retrieving documents")
     question = state["question"]
-    documents = retriever.invoke(question)
+    documents = st.session_state.retriever.invoke(question)
     return {"documents": documents, "question": question}
 
 def format_documents(documents):
@@ -385,40 +406,37 @@ def format_documents(documents):
 def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
-    answer_style = state.get("answer_style", "Concise") 
-    global llm
-    # Use current_llm instead of initializing a new one
-    rag_chain = rag_prompt | llm | StrOutputParser()
+    answer_style = state.get("answer_style", "Concise")
 
-    original_model_index = model_list.index(llm.model_name)  # Save the index of the original model
-    current_model_index = original_model_index  # Start with the original model
-    tried_models = set()  # Keep track of tried models
+    if "llm" not in st.session_state:
+        st.session_state.llm = initialize_llm(st.session_state.selected_model, answer_style)
+
+    rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
     if not documents:
         print("No documents available for generation.")
         return {"generation": "No relevant documents found.", "documents": documents, "question": question}
 
-    while len(tried_models) < len(model_list):  # Stop after all models have been tried
+    tried_models = set()
+    original_model = st.session_state.selected_model
+    current_model = original_model
+
+    while len(tried_models) < len(model_list):
         try:
-            # Get the current model
-            current_model = model_list[current_model_index]
-            tried_models.add(current_model)  # Mark the model as tried
+            tried_models.add(current_model)
+            st.session_state.llm = initialize_llm(current_model, answer_style)
+            rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
-            llm = initialize_llm(current_model, answer_style)
-
-            # Reinitialize rag_chain with the new LLM
-            rag_chain = rag_prompt | llm | StrOutputParser()  # **Rebinding rag_chain**
-
-            # Format context and generate response
             context = format_documents(documents)
-            generation = rag_chain.invoke({"context": context, "question": question, "answer_style" : answer_style})  # **Invocation**
+            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style})
+
             print(f"Generating a {answer_style} length response.")
-            print(f"Response generated with {llm.model_name} model.")
+            print(f"Response generated with {st.session_state.llm.model_name} model.")
             print("Done.")
-            # Revert to the original model if the current model is different
-            if current_model_index != original_model_index:
-                print(f"Reverting to original model: {model_list[original_model_index]}")
-                current_model_index = original_model_index
+
+            if current_model != original_model:
+                print(f"Reverting to original model: {original_model}")
+                st.session_state.llm = initialize_llm(original_model, answer_style)
 
             return {"documents": documents, "question": question, "generation": generation}
 
@@ -426,26 +444,21 @@ def generate(state):
             error_message = str(e)
             if "rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message:
                 print(f"Model's rate limit exceeded or request too large.")
-
-            # Handle model-specific errors (e.g., token limits)
-            if "rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message:
-                # Move to the next model (circularly)
-                current_model_index = (current_model_index + 1) % len(model_list)
-                print(f"Switching to model: {model_list[current_model_index]}")
+                current_model = model_list[(model_list.index(current_model) + 1) % len(model_list)]
+                print(f"Switching to model: {current_model}")
             else:
-                # Handle other exceptions without switching models
                 return {
                     "generation": f"Error during generation: {error_message}",
                     "documents": documents,
                     "question": question,
                 }
 
-    # If no model could handle the request
     return {
         "generation": "Unable to process the request due to limitations across all models.",
         "documents": documents,
         "question": question,
     }
+
 
 def handle_unrelated(state):
     question = state["question"]
@@ -467,7 +480,10 @@ def hybrid_search(state):
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
 
+@st.cache_data
 def web_search(state):
+    if "tavily_client" not in st.session_state:
+        st.session_state.tavily_client = TavilyClient()
     question = state["question"]
     question = re.sub(r'\b\w+\\|Internet search\b', '', question).strip()
     question = question + " in Finland"
@@ -598,7 +614,6 @@ def get_licensing_info(state):
 
 # # Router function
 def route_question(state):
-    global router_llm
     question = state["question"]
     hybrid_search_enabled = state.get("hybrid_search", False)
     internet_search_enabled = state.get("internet_search", False)
@@ -615,8 +630,8 @@ def route_question(state):
         "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
         "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
         "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-        "retrieve": "All other question related to business and entrepreneurship not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business and entrepreneurship in Finland, or related to other countries instead of Finland."
+        "retrieve": "All other question related to business, entrepreneurship, job and unemployment not covered by the other tools, but not asking information about any other country or city except Finland.)",
+        "unrelated": "Questions not related to business, entrepreneurship, job and unemployment in Finland, or related to other countries instead of Finland."
     }
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
@@ -645,10 +660,10 @@ def route_question(state):
     }
 
     # Invoke the chain
-    tool = (prompt | router_llm | StrOutputParser()).invoke(inputs)
+    tool = (prompt | st.session_state.router_llm | StrOutputParser()).invoke(inputs)
     tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
     if not "unrelated" in tool:
-        print(f"Invoking {tool} tool through {router_llm.model_name}")
+        print(f"Invoking {tool} tool through {st.session_state.router_llm.model_name}")
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
