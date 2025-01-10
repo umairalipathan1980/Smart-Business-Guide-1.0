@@ -691,7 +691,7 @@ if "workflow" not in st.session_state:
 
 
 # Compile app
-app = workflow.compile()
+app = st.session_state.workflow.compile()
 
 
 
