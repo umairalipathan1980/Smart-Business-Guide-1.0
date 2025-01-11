@@ -298,8 +298,10 @@ rag_prompt = PromptTemplate(
                 2. **Response style**:
                 - Address the query directly without unnecessary or speculative information.
                 - Do not draw from your knowledge base; strictly use the given context. However, take some liberty to provide more explanations and illustrations for better clarity and demonstration from your knowledge and experience only if answer style is "Moderate" or "Explanatory". 
-                - Consider the given answer style to produce the answer. If answer style = "Concise", generate a precise and concise answer. If answer style = "Moderate", use a moderate approach to generate answer
-                  where you can provide a little bit more explanation and elaborate the answer to improve clarity, integrating your own experience. If answer style = "Explanatory", elaborate the answer to provide more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience.
+                3. **Answer style**
+                - If answer style = "Concise", generate a concise answer. 
+                - If answer style = "Moderate", use a moderate approach to generate answer where you can provide a little bit more explanation and elaborate the answer to improve clarity, integrating your own experience. 
+                - If answer style = "Explanatory", elaborate the answer to provide more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience.
                   However, the explanations, examples and illustrations should be strictly based on the context. 
 
                 3. **Conversational tone**
@@ -314,9 +316,10 @@ rag_prompt = PromptTemplate(
                 - If there are discrepancies in the context, clearly explain them.
 
                 5. **Citation Rules**:
+                - Citation information may be present in the context in the form of [document name, page number] or URLs. It is very important to cite references if you find them in the context.
                 - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: [document_name, page xx].
                 - For the answer compiled from the context from multiple documents, use the format: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...].
-                - For responses derived from websearch results, include all the URLs returned by the websearch, each on a new line.
+                - For responses derived from websearch results and containing cited URLs, include all the URLs in hyperlink form returned by the websearch, each on a new line.
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
@@ -326,7 +329,6 @@ rag_prompt = PromptTemplate(
                     - Do not combine the data in the two sections. Create two separate sections. 
 
                 7. **Integrity and Trustworthiness**:
-                - Never provide information that is not explicitly found in the context, unless the answer style is "explanatory" in which you can add some examples and explanations only for illustration purposes.
                 - Ensure every part of your response complies with these rules.
 
                 <|eot_id|><|start_header_id|>user<|end_header_id|>
@@ -641,20 +643,50 @@ def route_question(state):
     if internet_search_enabled:
         return "websearch"
 
+    # tool_selection = {
+    #     "get_tax_info": "question related to tax related information including current tax rates, taxation rules, taxable incomes, tax exemption, tax filing process, etc., but not asking information about any other country or city except Finland.",
+    #     "get_contact_tool": "question related to contact information of the Finnish Immigration Service, also known as Migri (but not asking information about any other country or city except Finland.)",
+    #     "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
+    #     "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
+    #     "websearch": "question related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
+    #     "retrieve": "Question related to business, business planning, business opportunities, startups, business suggestion, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc not covered by the other tools, but not asking information about any other country or city except Finland.)",
+    #     "unrelated": "Question NOT related to business, business planning, business suggestion, business opportunities, startups, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc in Finland, or related to other countries instead of Finland."
+    # }
+
     tool_selection = {
-        "get_tax_info": "question related to tax related information including current tax rates, taxation rules, taxable incomes, tax exemption, tax filing process, etc., but not asking information about any other country or city except Finland.",
-        "get_contact_tool": "question related to contact information of the Finnish Immigration Service, also known as Migri (but not asking information about any other country or city except Finland.)",
-        "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
-        "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
-        "websearch": "questions related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-        "retrieve": "All other question related to business, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc not covered by the other tools, but not asking information about any other country or city except Finland.)",
-        "unrelated": "Questions not related to business, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc in Finland, or related to other countries instead of Finland."
-    }
+    "get_tax_info": (
+        "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
+    ),
+    "get_contact_tool": (
+        "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
+    ),
+    "get_registration_info": (
+        "Questions specifically about the process of company registration."
+        "This excludes broader questions about starting a business or similar processes."
+    ),
+    "get_licensing_info": (
+        "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
+        "This excludes questions about residence permits or licenses."
+    ),
+    "websearch": (
+        "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
+    ),
+    "retrieve": (
+        "Questions broadly related to business, business planning, business opportunities, startups, entrepreneurship, employment, unemployment, pensions, insurance, social benefits, and similar topics"
+        "This includes questions about specific business opportunities (e.g., for specific expertise, area, topic) or suggestions. "
+    ),
+    "unrelated": (
+        "Questions not related to business, entrepreneurship, startups, employment, unemployment, pensions, insurance, social benefits, or similar topics, "
+        "or those related to other countries or cities instead of Finland."
+    )
+}
+
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
                  - Analyze the given question and use the given tool selection dictionary to output the name of the relevant tool based on its description and relevancy with the question. 
                    The dictionary has tool names as keys and their descriptions as values. 
                  - Output only and only tool name, i.e., the exact key and nothing else with no explanations at all. 
+                 - For questions mentioning any other country except Finland, or any other city except a Finnish city, output 'unrelated'.
                 """
 
     # Define the ChatPromptTemplate
@@ -732,6 +764,5 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
-
 
 
