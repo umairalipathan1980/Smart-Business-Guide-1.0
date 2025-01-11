@@ -92,7 +92,7 @@ with st.sidebar:
         answer_style = st.select_slider(
             "💬 Answer Style",
             options=["Concise", "Moderate", "Explanatory"],
-            value="Moderate",
+            value="Concise",
             key="answer_style_slider",
             disabled=False
         )
