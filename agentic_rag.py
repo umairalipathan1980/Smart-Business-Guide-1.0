@@ -291,7 +291,7 @@ rag_prompt = PromptTemplate(
 
                 1. **Context-Only Answers with a given answer style**:
                 - Always base your answers on the provided context and answer style.
-                - If the context does not contain relevant information, respond with: 'No information found. Switch to internet or hybrid search.'
+                - If the context does not contain relevant information, respond with: 'No information found. Switch to internet search.'
                 - If the context contains some pieces of the required information, answer with that information and very briefly mention that the answer to other parts could not be found.
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
@@ -305,8 +305,8 @@ rag_prompt = PromptTemplate(
                   However, the explanations, examples and illustrations should be strictly based on the context. 
 
                 3. **Conversational tone**
-                 - Maintain a conversational but professional tone. 
-                 - Use simple language. Explain difficult concepts or terms wherever needed.
+                 - Maintain a conversational and helping style which should tend to guide the user and provide him help, hints and offers to further help and information. 
+                 - Use simple language. Explain difficult concepts or terms wherever needed. Present the information in the best readable form.
 
                 4. **Formatting Guidelines**:
                 - Use bullet points for lists.
@@ -489,7 +489,7 @@ def handle_unrelated(state):
 def hybrid_search(state):
     question = state["question"]
     print("Invoking retriever...")
-    vector_docs = retriever.invoke(question)
+    vector_docs = st.session_state.retriever.invoke(question)
     web_docs = web_search({"question": question})["documents"]
     
     # Add headings to distinguish between vector and web search results
