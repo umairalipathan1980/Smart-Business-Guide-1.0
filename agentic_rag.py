@@ -291,7 +291,7 @@ rag_prompt = PromptTemplate(
 
                 1. **Context-Only Answers with a given answer style**:
                 - Always base your answers on the provided context and answer style.
-                - If the context does not contain relevant information, respond with: 'No information found.'
+                - If the context does not contain relevant information, respond with: 'No information found. Switch to internet or hybrid search.'
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
                 2. **Response style**:
