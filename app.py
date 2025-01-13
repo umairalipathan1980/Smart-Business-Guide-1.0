@@ -24,10 +24,10 @@ if "messages" not in st.session_state:
 
 # Sidebar layout
 with st.sidebar:
-    # try:
-    #     st.image("LOGO_UPBEAT.jpg", width=150, use_container_width=True)
-    # except Exception as e:
-    #     st.warning("Unable to load image. Continuing without it.")
+    try:
+        st.image("LOGO_UPBEAT.jpg", width=150, use_container_width=True)
+    except Exception as e:
+        st.warning("Unable to load image. Continuing without it.")
 
     st.title("🗣️ Smart Guide 1.0")
     st.markdown("**▶️ Actions:**")
@@ -109,10 +109,6 @@ with st.sidebar:
     internet_search = search_option == "Internet search only"
     
     reset_button = st.button("🔄 Reset Conversation", key="reset_button")
-
-    # if st.button('Clear All Cache'):
-    #     st.cache_data.clear()
-    #     st.success('All cache cleared successfully!')
 
     # Initialize the app with the selected model
     app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
