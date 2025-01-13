@@ -1,15 +1,53 @@
 # Smart Business Guide 1.0
-**Smart guide for entrepreneurship and business planning in Finland based on agentic RAG (Langchain and LangGraph).**   
 
-This Smart Guide assists users with business and entrepreneurship queries in Finland by retrieving information from authetnic guides, performing internet or hybrid searches, and generating tailored responses using agentic AI workflows.  
+### Overview
+The **Smart Business Guide 1.0** is an AI-powered solution for entrepreneurship and business planning in Finland, built on **Agentic RAG** using LangChain and LangGraph frameworks. It leverages advanced retrieval-augmented generation workflows to provide precise and actionable responses to user queries.
 
-* Retrieval from authentic business and entrepreneurship guides, parsed through LlamaParse
-* Dynamic decisions to select vector database, web search, or a specific tool to extract information from trusted sources.
-* A retrieval grading mechanism to assess the relevancy of the retrieved documents and deciding whether to proceed with the retrieved documents and invoking web search.
-* Option to select three different answer styles: concise, moderate, and explanatory.
-* Options to enforce internet or hybrid search. 
+---
 
-The smart guide offers the options to selection several open-source models as well as OpenAI models. The open-source models are accessed using Groq Cloud API which offer a lightening fast response to queries. Different LLMs can be selected for different nodes in the agentic workflow. 
+### Key Features
+
+- **Authentic Information Retrieval**  
+  Retrieves information from authentic business and entrepreneurship guides parsed using LlamaParse.
+
+- **Dynamic Workflow Decisions**  
+  Determines whether to use vector databases, web searches, or specialized tools based on query requirements, ensuring trusted and relevant results.
+
+- **Retrieval Grading Mechanism**  
+  Evaluates the relevancy of retrieved documents, deciding whether to proceed with the data or invoke a web search for additional information.
+
+- **Answer Style Customization**  
+  Provides flexibility to choose from three response styles:
+  - **Concise**: Focused and brief answers.
+  - **Moderate**: Balanced with some explanation.
+  - **Explanatory**: Detailed with examples and illustrations.
+
+- **Flexible Search Options**  
+  Supports:
+  - Internet-only search.
+  - Hybrid search combining vector database results with internet queries.
+
+- **Model Selection Flexibility**  
+  Offers the ability to select:
+  - Open-source models accessed via Groq Cloud API for lightning-fast responses.
+  - OpenAI models for enhanced capabilities.
+  Different LLMs can be assigned to specific nodes within the agentic workflow for tailored performance.
+
+---
+
+### How It Works
+The Smart Guide integrates agentic AI workflows to dynamically:
+1. Parse and retrieve data from pre-indexed guides.
+2. Assess retrieved content for relevance.
+3. Choose the most appropriate method (vector database, web search, or tools) to address the query.
+4. Provide tailored responses based on user-selected answer styles.
+
+---
+
+### Use Case
+Ideal for entrepreneurs, business owners, and professionals seeking actionable and reliable insights tailored to the Finnish business environment.
+
+---
 
 # How to Use the Code.
 **Clone the repository:**
