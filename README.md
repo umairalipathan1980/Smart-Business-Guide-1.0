@@ -1,7 +1,15 @@
 # Smart Business Guide 1.0
 **Smart guide for entrepreneurship and business planning in Finland based on agentic RAG (Langchain and LangGraph).**   
 
-This Smart Guide assists users with business and entrepreneurship queries in Finland by retrieving information from authetnic guides, performing internet or hybrid searches, and generating tailored responses using agentic AI workflows.
+This Smart Guide assists users with business and entrepreneurship queries in Finland by retrieving information from authetnic guides, performing internet or hybrid searches, and generating tailored responses using agentic AI workflows.  
+
+* Retrieval from authentic business and entrepreneurship guides, parsed through LlamaParse
+* Dynamic decisions to select vector database, web search, or a specific tool to extract information from trusted sources.
+* A retrieval grading mechanism to assess the relevancy of the retrieved documents and deciding whether to proceed with the retrieved documents and invoking web search.
+* Option to select three different answer styles: concise, moderate, and explanatory.
+* Options to enforce internet or hybrid search. 
+
+The smart guide offers the options to selection several open-source models as well as OpenAI models. The open-source models are accessed using Groq Cloud API which offer a lightening fast response to queries. Different LLMs can be selected for different nodes in the agentic workflow. 
 
 # How to Use the Code.
 **Clone the repository:**
