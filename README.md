@@ -44,7 +44,7 @@ Ideal for entrepreneurs, business owners, and professionals seeking actionable a
 ---
 ### Agentic workflow
 <p align="center">
-  <img src="images/agentic_workflow.png" alt="My Figure" width="700">
+  <img src="images/agentic_workflow.png" alt="My Figure" width="1200">
   <br>
   <em>The entire workflow of the application</em>
 </p>  
