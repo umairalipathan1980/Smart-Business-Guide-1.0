@@ -50,7 +50,7 @@ Ideal for entrepreneurs, business owners, and professionals seeking actionable a
 </p>  
 
 ---
-###Streamlit App
+### Streamlit App
 <p align="center">
   <img src="images/streamlit app.png" alt="My Figure" width="1000">
   <br>
