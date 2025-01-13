@@ -17,6 +17,6 @@ Create a folder ".streamlit" in the root directory and create a "secrets.toml" f
    ```
    GROQ_API_KEY = "your_GROQ_api_key"
    TAVILY_API_KEY = "your_Tavily_api_key"
-   LANGCHAIN_API_KEY = "your_LangChain_API_key"
+   LANGCHAIN_API_KEY = "your_LangChain_API_key" # get a free API key from LangSmith
    OPENAI_API_KEY = "your_OpenAI_API_KEY" # (optional) for OpenAI models
    ```
