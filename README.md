@@ -1,5 +1,5 @@
 # Smart Business Guide 1.0
-Smart guide for entrepreneurship and business planning in Finland based on agentic RAG (Langchain and LangGraph).   
+**Smart guide for entrepreneurship and business planning in Finland based on agentic RAG (Langchain and LangGraph).**   
 
 This Smart Guide assists users with business and entrepreneurship queries in Finland by retrieving information from authetnic guides, performing internet or hybrid searches, and generating tailored responses using agentic AI workflows.
 
