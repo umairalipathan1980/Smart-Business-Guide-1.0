@@ -50,6 +50,12 @@ Ideal for entrepreneurs, business owners, and professionals seeking actionable a
 </p>  
 
 ---
+###Streamlit App
+<p align="center">
+  <img src="images/streamlit app.png" alt="My Figure" width="1000">
+  <br>
+  <em>A snapshot of the streamlit application</em>
+</p>  
 
 # How to Use the Code.
 **Clone the repository:**
