@@ -42,6 +42,14 @@ The Smart Guide integrates agentic AI workflows to dynamically:
 Ideal for entrepreneurs, business owners, and professionals seeking actionable and reliable insights tailored to the Finnish business environment.
 
 ---
+### Agentic workflow
+<p align="center">
+  <img src="images/agentic_workflow.png" alt="My Figure" width="700">
+  <br>
+  <em>The entire workflow of the application</em>
+</p>  
+
+---
 
 # How to Use the Code.
 **Clone the repository:**
