@@ -24,7 +24,7 @@ if "messages" not in st.session_state:
 
 # Sidebar layout
 with st.sidebar:
-    try:
+    # try:
     #     st.image("LOGO_UPBEAT.jpg", width=150, use_container_width=True)
     # except Exception as e:
     #     st.warning("Unable to load image. Continuing without it.")
