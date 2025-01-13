@@ -1,34 +1,28 @@
 # Smart Business Guide 1.0
 
 ### Overview
-The **Smart Business Guide 1.0** is an AI-powered solution for entrepreneurship and business planning in Finland, built on **Agentic RAG** using LangChain and LangGraph frameworks. It leverages advanced retrieval-augmented generation workflows to provide precise and actionable responses to user queries.
+The **Smart Business Guide 1.0** is an AI-powered solution for entrepreneurship and business planning in Finland, built on advanced **Agentic RAG** using LangChain and LangGraph frameworks. It uses advanced retrieval-augmented generation workflows to provide precise responses to user queries.
 
 ---
 
 ### Key Features
 
-- **Authentic Information Retrieval**  
-  Retrieves information from authentic business and entrepreneurship guides parsed using LlamaParse.
+- **Authentic Information Retrieval**: Retrieves information from authentic business and entrepreneurship guides parsed using LlamaParse.
 
-- **Dynamic Workflow Decisions**  
-  Determines whether to use vector databases, web searches, or specialized tools based on query requirements, ensuring trusted and relevant results.
+- **Dynamic Workflow Decisions**: Determines whether to use vector databases, web searches, or specialized tools based on query requirements, ensuring trusted and relevant results.
 
-- **Retrieval Grading Mechanism**  
-  Evaluates the relevancy of retrieved documents, deciding whether to proceed with the data or invoke a web search for additional information.
+- **Retrieval Grading Mechanism**: Evaluates the relevancy of retrieved documents, deciding whether to proceed with the data or invoke a web search for additional information.
 
-- **Answer Style Customization**  
-  Provides flexibility to choose from three response styles:
+- **Answer Style Customization**: Provides flexibility to choose from three response styles:
   - **Concise**: Focused and brief answers.
   - **Moderate**: Balanced with some explanation.
   - **Explanatory**: Detailed with examples and illustrations.
 
 - **Flexible Search Options**  
-  Supports:
   - Internet-only search.
   - Hybrid search combining vector database results with internet queries.
 
-- **Model Selection Flexibility**  
-  Offers the ability to select:
+- **Model Selection Flexibility**: Offers the ability to select:
   - Open-source models accessed via Groq Cloud API for lightning-fast responses.
   - OpenAI models for enhanced capabilities.
   Different LLMs can be assigned to specific nodes within the agentic workflow for tailored performance.
