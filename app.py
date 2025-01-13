@@ -1,3 +1,4 @@
+# Comment the first 3 statements if pysqlite3 error is encountered
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
