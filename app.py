@@ -119,7 +119,7 @@ with st.sidebar:
     if reset_button:
         st.session_state.messages = []
 # Title
-st.title("📘 Smart Guide for Entrepreneurship and Business Planning in Finlandddd")
+st.title("📘 Smart Guide for Entrepreneurship and Business Planning in Finland")
 st.markdown(
     """
     <div style="text-align: left; font-size: 18px; margin-top: 20px; line-height: 1.6;">
