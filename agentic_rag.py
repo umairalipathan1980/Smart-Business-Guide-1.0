@@ -537,7 +537,7 @@ def web_search(state):
         search_depth="advanced"
         )
 
-        search_results = tool.invoke({
+        search_result = tool.invoke({
             "query": question,
         })
 
