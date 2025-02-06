@@ -507,7 +507,18 @@ def web_search(state):
         search_result = st.session_state.tavily_client.get_search_context(
             query = question,
             search_depth="advanced",
-            max_tokens=4000
+            max_tokens=4000,
+            include_domains = [
+                "migri.fi",
+                "enterfinland.fi",
+                "kela.fi",
+                "vero.fi",
+                "suomi.fi",
+                "valvira.fi",
+                "finlex.fi",
+                "hus.fi",
+                "lvm.fi"
+                ],
         )
 
         # if "tavily_client" not in st.session_state:
