@@ -516,7 +516,7 @@ def web_search(state):
                 "finlex.fi",
                 "hus.fi",
                 "lvm.fi"
-            ]
+            ],
             search_depth="advanced",
             max_tokens=4000
         )
