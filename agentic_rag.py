@@ -504,9 +504,25 @@ def web_search(state):
     documents = state.get("documents", [])
     try:
         print("Invoking internet search...")
-        search_result = st.session_state.tavily_client.get_search_context(
-            query=question,
-            include_domains = [
+        # search_result = st.session_state.tavily_client.get_search_context(
+        #     query=question,
+        #     include_domains = [
+        #         "migri.fi",
+        #         "enterfinland.fi",
+        #         "kela.fi",
+        #         "vero.fi",
+        #         "suomi.fi",
+        #         "valvira.fi",
+        #         "finlex.fi",
+        #         "hus.fi",
+        #         "lvm.fi"
+        #     ],
+        #     search_depth="advanced",
+        #     max_tokens=4000
+        # )
+
+        tool = TavilySearchResults(
+        include_domains = [
                 "migri.fi",
                 "enterfinland.fi",
                 "kela.fi",
@@ -517,9 +533,14 @@ def web_search(state):
                 "hus.fi",
                 "lvm.fi"
             ],
-            search_depth="advanced",
-            max_tokens=4000
+        max_results=5,
+        search_depth="advanced"
         )
+
+        results = tool.invoke({
+            "query": question,
+        })
+        
         # Handle different types of results
         if isinstance(search_result, str):
             web_results = search_result
