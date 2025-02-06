@@ -496,52 +496,39 @@ def hybrid_search(state):
 
 #@st.cache_data
 def web_search(state):
-    # if "tavily_client" not in st.session_state:
-    #     st.session_state.tavily_client = TavilyClient()
+    if "tavily_client" not in st.session_state:
+        st.session_state.tavily_client = TavilyClient()
     question = state["question"]
     question = re.sub(r'\b\w+\\|Internet search\b', '', question).strip()
     question = question + " in Finland"
     documents = state.get("documents", [])
     try:
         print("Invoking internet search...")
-        # search_result = st.session_state.tavily_client.get_search_context(
-        #     query=question,
-        #     include_domains = [
-        #         "migri.fi",
-        #         "enterfinland.fi",
-        #         "kela.fi",
-        #         "vero.fi",
-        #         "suomi.fi",
-        #         "valvira.fi",
-        #         "finlex.fi",
-        #         "hus.fi",
-        #         "lvm.fi"
-        #     ],
-        #     search_depth="advanced",
-        #     max_tokens=4000
-        # )
+        search_result = st.session_state.tavily_client.get_search_context(
+            search_depth="advanced",
+            max_tokens=4000
+        )
 
-        if "tavily_client" not in st.session_state:
-            st.session_state.tool = TavilySearchResults(
-                include_domains = [
-                        "migri.fi",
-                        "enterfinland.fi",
-                        "kela.fi",
-                        "vero.fi",
-                        "suomi.fi",
-                        "valvira.fi",
-                        "finlex.fi",
-                        "hus.fi",
-                        "lvm.fi"
-                    ],
-                max_results=5,
-                search_depth="advanced"
-                )
+        # if "tavily_client" not in st.session_state:
+        #     st.session_state.tool = TavilySearchResults(
+        #         include_domains = [
+        #                 "migri.fi",
+        #                 "enterfinland.fi",
+        #                 "kela.fi",
+        #                 "vero.fi",
+        #                 "suomi.fi",
+        #                 "valvira.fi",
+        #                 "finlex.fi",
+        #                 "hus.fi",
+        #                 "lvm.fi"
+        #             ],
+        #         max_results=5,
+        #         search_depth="advanced"
+        #         )
 
-        search_result = tool.invoke({
-            "query": question,
-        })
-        print(f"search results = {search_result}")
+        # search_result = tool.invoke({
+        #     "query": question,
+        # })
 
         
         
