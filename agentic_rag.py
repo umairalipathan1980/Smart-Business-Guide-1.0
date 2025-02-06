@@ -505,6 +505,7 @@ def web_search(state):
     try:
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
+            query = question,
             search_depth="advanced",
             max_tokens=4000
         )
