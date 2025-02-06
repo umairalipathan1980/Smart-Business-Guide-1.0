@@ -10,7 +10,6 @@ os.environ["GROQ_API_KEY"]=st.secrets["GROQ_API_KEY"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -160,8 +159,6 @@ def load_or_create_vs(persist_directory):
 
     return vectorstore
 
-
-
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
@@ -249,8 +246,6 @@ def initialize_embedding_model(selected_embedding_model):
             st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
 
     return st.session_state.embed_model
-
-
 
 #@st.cache_resource
 def initialize_router_llm(selected_routing_model):
@@ -511,6 +506,17 @@ def web_search(state):
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
             query=question,
+            include_domains = [
+            "migri.fi",
+            "enterfinland.fi",
+            "kela.fi",
+            "vero.fi",
+            "suomi.fi",
+            "valvira.fi",
+            "finlex.fi",
+            "hus.fi",
+            "lvm.fi"
+            ]
             search_depth="advanced",
             max_tokens=4000
         )
