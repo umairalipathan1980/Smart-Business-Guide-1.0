@@ -537,9 +537,12 @@ def web_search(state):
         search_depth="advanced"
         )
 
-        results = tool.invoke({
+        search_results = tool.invoke({
             "query": question,
         })
+
+
+        
         
         # Handle different types of results
         if isinstance(search_result, str):
