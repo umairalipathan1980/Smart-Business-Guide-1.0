@@ -506,6 +506,17 @@ def web_search(state):
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
             query=question,
+            include_domains = [
+                "migri.fi",
+                "enterfinland.fi",
+                "kela.fi",
+                "vero.fi",
+                "suomi.fi",
+                "valvira.fi",
+                "finlex.fi",
+                "hus.fi",
+                "lvm.fi"
+            ]
             search_depth="advanced",
             max_tokens=4000
         )
