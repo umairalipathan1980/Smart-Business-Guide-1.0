@@ -318,7 +318,7 @@ rag_prompt = PromptTemplate(
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
-                - If hybrid search = "Yes", structure your response in corresponding sections with the following headings:
+                - If hybrid search = "True", structure your response in corresponding sections with the following headings:
                     - **Smart guide results**: Include data from vectorstore retrieval and its citations in the format: [document_name, page xx].
                     - **Internet search results**: Include data from websearch and its citations (URLs). This does not mean only internet URLs, but all the data in 'Internet search results:' along with URLs.
                     - Do not combine the data in the two sections. Create two separate sections. 
