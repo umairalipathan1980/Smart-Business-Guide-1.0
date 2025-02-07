@@ -330,7 +330,7 @@ rag_prompt = PromptTemplate(
                 Question: {question} 
                 Context: {context} 
                 Answer style: {answer_style}
-                hybrid search enabled: {hybrid_search}
+                hybrid search enabled: {hybrid_search_enabled}
                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
                 input_variables=["question", "context", "answer_style", "hybrid_search_enabled "]
 
