@@ -407,7 +407,6 @@ class GraphState(TypedDict):
     web_search_needed: str
     documents: List[Document]
     answer_style: str
-    hybrid_search: str
 
 def retrieve(state):
     print("Retrieving documents")
@@ -423,7 +422,7 @@ def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
     answer_style = state.get("answer_style", "Concise")
-    hybrid_search = state.get("hybrid_search", "No")
+    hybrid_search_enabled = state.get("hybrid_search", False)
 
     if "llm" not in st.session_state:
         st.session_state.llm = initialize_llm(st.session_state.selected_model, answer_style)
@@ -445,7 +444,7 @@ def generate(state):
             rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
             context = format_documents(documents)
-            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style, "hybrid_search": hybrid_search})
+            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style, "hybrid_search": hybrid_search_enabled})
 
             print(f"Generating a {answer_style} length response.")
             print(f"Response generated with {st.session_state.llm.model_name} model.")
