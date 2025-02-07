@@ -318,7 +318,7 @@ rag_prompt = PromptTemplate(
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
-                - If hybrid search = "True", structure your response in corresponding sections with the following headings:
+                - If hybrid search enabled= "True", structure your response in corresponding sections with the following headings:
                     - **Smart guide results**: Include data from vectorstore retrieval and its citations in the format: [document_name, page xx].
                     - **Internet search results**: Include data from websearch and its citations (URLs). This does not mean only internet URLs, but all the data in 'Internet search results:' along with URLs.
                     - Do not combine the data in the two sections. Create two separate sections. 
@@ -330,9 +330,9 @@ rag_prompt = PromptTemplate(
                 Question: {question} 
                 Context: {context} 
                 Answer style: {answer_style}
-                hybrid search: {hybrid_search}
+                hybrid search enabled: {hybrid_search}
                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-                input_variables=["question", "context", "answer_style", "hybrid_search"]
+                input_variables=["question", "context", "answer_style", "hybrid_search_enabled "]
 
 )
 
@@ -407,6 +407,7 @@ class GraphState(TypedDict):
     web_search_needed: str
     documents: List[Document]
     answer_style: str
+    hybrid_search_enabled: str
 
 def retrieve(state):
     print("Retrieving documents")
@@ -444,7 +445,7 @@ def generate(state):
             rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
             context = format_documents(documents)
-            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style, "hybrid_search": hybrid_search_enabled})
+            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style, "hybrid_search_enabled": hybrid_search_enabled})
 
             print(f"Generating a {answer_style} length response.")
             print(f"Response generated with {st.session_state.llm.model_name} model.")
