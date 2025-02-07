@@ -10,6 +10,7 @@ os.environ["GROQ_API_KEY"]=st.secrets["GROQ_API_KEY"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
+
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -159,6 +160,8 @@ def load_or_create_vs(persist_directory):
 
     return vectorstore
 
+
+
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
@@ -247,6 +250,8 @@ def initialize_embedding_model(selected_embedding_model):
 
     return st.session_state.embed_model
 
+
+
 #@st.cache_resource
 def initialize_router_llm(selected_routing_model):
     if "router_llm" not in st.session_state or st.session_state.router_llm.model_name != selected_routing_model:
@@ -286,7 +291,7 @@ rag_prompt = PromptTemplate(
 
                 1. **Context-Only Answers with a given answer style**:
                 - Always base your answers on the provided context and answer style.
-                - If the context does not contain relevant information, respond with: 'No information found. Try switching the answer style to 'Moderate' or 'Explanatory''
+                - If the context does not contain relevant information, respond with: 'No information found. Switch to internet search.'
                 - If the context contains some pieces of the required information, answer with that information and very briefly mention that the answer to other parts could not be found.
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
@@ -318,7 +323,7 @@ rag_prompt = PromptTemplate(
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
-                - If hybrid search enabled= "True", structure your response in corresponding sections with the following headings:
+                - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
                     - **Smart guide results**: Include data from vectorstore retrieval and its citations in the format: [document_name, page xx].
                     - **Internet search results**: Include data from websearch and its citations (URLs). This does not mean only internet URLs, but all the data in 'Internet search results:' along with URLs.
                     - Do not combine the data in the two sections. Create two separate sections. 
@@ -330,9 +335,8 @@ rag_prompt = PromptTemplate(
                 Question: {question} 
                 Context: {context} 
                 Answer style: {answer_style}
-                hybrid search enabled: {hybrid_search_enabled}
                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-                input_variables=["question", "context", "answer_style", "hybrid_search_enabled "]
+                input_variables=["question", "context", "answer_style"]
 
 )
 
@@ -365,7 +369,6 @@ def initialize_grader_chain():
 
     # Build grader chain
     return grade_prompt | structured_llm_grader
-
 
 def grade_documents(state):
     question = state["question"]
@@ -407,7 +410,6 @@ class GraphState(TypedDict):
     web_search_needed: str
     documents: List[Document]
     answer_style: str
-    hybrid_search_enabled: str
 
 def retrieve(state):
     print("Retrieving documents")
@@ -423,7 +425,6 @@ def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
     answer_style = state.get("answer_style", "Concise")
-    hybrid_search_enabled = state.get("hybrid_search", False)
 
     if "llm" not in st.session_state:
         st.session_state.llm = initialize_llm(st.session_state.selected_model, answer_style)
@@ -445,7 +446,7 @@ def generate(state):
             rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
             context = format_documents(documents)
-            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style, "hybrid_search_enabled": hybrid_search_enabled})
+            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style})
 
             print(f"Generating a {answer_style} length response.")
             print(f"Response generated with {st.session_state.llm.model_name} model.")
@@ -508,7 +509,7 @@ def web_search(state):
     try:
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
-            query = question,
+            query=question,
             search_depth="advanced",
             max_tokens=4000,
             include_domains = [
@@ -523,30 +524,6 @@ def web_search(state):
                 "lvm.fi"
                 ],
         )
-
-        # if "tavily_client" not in st.session_state:
-        #     st.session_state.tool = TavilySearchResults(
-        #         include_domains = [
-        #                 "migri.fi",
-        #                 "enterfinland.fi",
-        #                 "kela.fi",
-        #                 "vero.fi",
-        #                 "suomi.fi",
-        #                 "valvira.fi",
-        #                 "finlex.fi",
-        #                 "hus.fi",
-        #                 "lvm.fi"
-        #             ],
-        #         max_results=5,
-        #         search_depth="advanced"
-        #         )
-
-        # search_result = tool.invoke({
-        #     "query": question,
-        # })
-
-        
-        
         # Handle different types of results
         if isinstance(search_result, str):
             web_results = search_result
@@ -676,16 +653,6 @@ def route_question(state):
     if internet_search_enabled:
         return "websearch"
 
-    # tool_selection = {
-    #     "get_tax_info": "question related to tax related information including current tax rates, taxation rules, taxable incomes, tax exemption, tax filing process, etc., but not asking information about any other country or city except Finland.",
-    #     "get_contact_tool": "question related to contact information of the Finnish Immigration Service, also known as Migri (but not asking information about any other country or city except Finland.)",
-    #     "get_registration_info": "question specifically related to the process of company registration. This does not include questions related to starting a business. The question should not ask information about any other country or city except Finland.",
-    #     "get_licensing_info": "question related to licensing, permits and notifications required for foreign entrepreneurs to start a business. This does not include questions related to residence permits. The question should not ask information about any other country or city except Finland.",
-    #     "websearch": "question related to residence permit, visa, and moving to Finland or the questions requiring current statistics, but not asking information about any other country or city except Finland.",
-    #     "retrieve": "Question related to business, business planning, business opportunities, startups, business suggestion, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc not covered by the other tools, but not asking information about any other country or city except Finland.)",
-    #     "unrelated": "Question NOT related to business, business planning, business suggestion, business opportunities, startups, entrepreneurship, job, unemployment, pension, insurance, social benefits, etc in Finland, or related to other countries instead of Finland."
-    # }
-
     tool_selection = {
     "get_tax_info": (
         "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
@@ -749,6 +716,8 @@ def route_question(state):
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
+
+    
 workflow = StateGraph(GraphState)
 
 # Add nodes
@@ -797,5 +766,4 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
-
 
