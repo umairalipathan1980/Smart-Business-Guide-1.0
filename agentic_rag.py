@@ -281,17 +281,20 @@ model_list = [
     "mixtral-8x7b-32768", 
     "gemma2-9b-it",
     "gpt-4o-mini",
-    "gpt-4o"
+    "gpt-4o",
+    "deepseek-r1-distill-llama-70b"
     ]
 
 rag_prompt = PromptTemplate(
     template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-                You are a highly accurate and trustworthy assistant specialized in answering questions related to business and entrepreneurship in Finland. 
+                You are a helpful, highly accurate and trustworthy assistant specialized in answering questions related to business, entrepreneurship, and the realted matters in Finland. 
                 Your responses must strictly adhere to the provided context, answer style, using the follow these rules:
+
+                0. If the context documents contain 'Internt search results' in 'page_content' field, always consider them in your response.
 
                 1. **Context-Only Answers with a given answer style**:
                 - Always base your answers on the provided context and answer style.
-                - If the context does not contain relevant information, respond with: 'No information found. Switch to internet search.'
+                - If the context does not contain relevant information, respond with: 'No information found. Try again or rephrase the query.'
                 - If the context contains some pieces of the required information, answer with that information and very briefly mention that the answer to other parts could not be found.
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
@@ -301,8 +304,7 @@ rag_prompt = PromptTemplate(
                 3. **Answer style**
                 - If answer style = "Concise", generate a concise answer. 
                 - If answer style = "Moderate", use a moderate approach to generate answer where you can provide a little bit more explanation and elaborate the answer to improve clarity, integrating your own experience. 
-                - If answer style = "Explanatory", elaborate the answer to provide more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience.
-                  However, the explanations, examples and illustrations should be strictly based on the context. 
+                - If answer style = "Explanatory", provide a detailed and elaborated answer by providing more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience. However, the explanations, examples and illustrations should be strictly based on the context. 
 
                 3. **Conversational tone**
                  - Maintain a conversational and helping style which should tend to guide the user and provide him help, hints and offers to further help and information. 
@@ -317,17 +319,18 @@ rag_prompt = PromptTemplate(
 
                 5. **Citation Rules**:
                 - Citation information may be present in the context in the form of [document name, page number] or URLs. It is very important to cite references if you find them in the context.
-                - For responses based on vectorstore retrieval, cite the document name and page number with each piece of information in the format: [document_name, page xx].
+                - For responses based on the context documents containing 'page_content' field of 'Smart guide results:', cite the document name and page number with each piece of information in the format: [document_name, page xx].
                 - For the answer compiled from the context from multiple documents, use the format: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...].
-                - For responses derived from websearch results and containing cited URLs, include all the URLs in hyperlink form returned by the websearch, each on a new line.
+                - For responses based on the documents containing the 'page_content' field of 'Internet search results:', include all the URLs in hyperlink form returned by the websearch, each on a new line.
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
-                - If the context contains two different sections with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
-                    - **Smart guide results**: Include data from vectorstore retrieval and its citations in the format: [document_name, page xx].
-                    - **Internet search results**: Include data from websearch and its citations (URLs). This does not mean only internet URLs, but all the data in 'Internet search results:' along with URLs.
-                    - Do not combine the data in the two sections. Create two separate sections. 
-
+                - If and only if the context contains documents with two different 'page_content' with the names 'Smart guide results:' and 'Internet search results:', structure your response in corresponding sections with the following headings:
+                    - **Smart guide results**: Include data from 'Smart guide results' and its citations in the format: [document_name, page xx]. If the 'Smart guide results' do not contain any information relevant to the question, output 'No information found' in this section.
+                    - **Internet search results**: Include data from 'Internet search results' and its citations (URLs). 
+                    - Ensure that you create two separate sections if and only if the context contain documents with two different 'page_content': 'Smart guide results:' and 'Internet search results:'.
+                    - Do not create two different sections or mention 'Smart guide results:' or 'Internet search results:' in your response if the context does not contain documents with two different 'page_content': 'Smart guide results:' and 'Internet search results:'.
+                    - Always include the document with 'page_content' of 'Internet search results:' in your response.
                 7. **Integrity and Trustworthiness**:
                 - Ensure every part of your response complies with these rules.
 
@@ -445,11 +448,12 @@ def generate(state):
             st.session_state.llm = initialize_llm(current_model, answer_style)
             rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
-            context = format_documents(documents)
+            #context = format_documents(documents)
+            context = documents
             generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style})
 
             print(f"Generating a {answer_style} length response.")
-            print(f"Response generated with {st.session_state.llm.model_name} model.")
+            #print(f"Response generated with {st.session_state.llm.model_name} model.")
             print("Done.")
 
             if current_model != original_model:
@@ -492,8 +496,20 @@ def hybrid_search(state):
     web_docs = web_search({"question": question})["documents"]
     
     # Add headings to distinguish between vector and web search results
-    vector_results = [Document(page_content="Smart guide results:\n\n" + doc.page_content) for doc in vector_docs]
-    web_results = [Document(page_content="\n\nInternet search results:\n\n" + doc.page_content) for doc in web_docs]
+    vector_results = [Document(page_content="Smart guide results:" + doc.page_content) for doc in vector_docs]
+    # web_results = [Document(page_content="\n\nInternet search results:\n\n" + doc.page_content) for doc in web_docs]
+
+    # Check if any web_docs already contain "Internet search results:"
+    web_results_contain_header = any("Internet search results:" in doc.page_content for doc in web_docs)
+
+    # Add "Internet search results:" only if not already present in any web doc
+    if not web_results_contain_header:
+        web_results = [
+            Document(page_content="Internet search results:" + doc.page_content) for doc in web_docs
+        ]
+    else:
+        web_results = web_docs  # Keep web_docs unchanged if they already contain the header
+
     
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
@@ -512,23 +528,30 @@ def web_search(state):
             query=question,
             search_depth="advanced",
             max_tokens=4000,
+            max_results = 10,
             include_domains = [
                 "migri.fi",
                 "enterfinland.fi",
+                "businessfinland.fi",
                 "kela.fi",
                 "vero.fi",
                 "suomi.fi",
                 "valvira.fi",
                 "finlex.fi",
                 "hus.fi",
-                "lvm.fi"
+                "lvm.fi",
+                "thefinlandbusinesspress.fi",
+                "infofinland.fi",
+                "ely-keskus.fi",
+                "yritystulkki.fi",
+                "tem.fi"
                 ],
         )
         # Handle different types of results
         if isinstance(search_result, str):
             web_results = search_result
         elif isinstance(search_result, dict) and "documents" in search_result:
-            web_results = "\n".join([doc.get("content", "") for doc in search_result["documents"]])
+            web_results = "Internet search results:".join([doc.get("content", "") for doc in search_result["documents"]])
         else:
             web_results = "No valid results returned by TavilyClient."
         web_results_doc = Document(page_content=web_results)
@@ -654,22 +677,22 @@ def route_question(state):
         return "websearch"
 
     tool_selection = {
-    "get_tax_info": (
-        "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
-    ),
-    "get_contact_tool": (
-        "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
-    ),
-    "get_registration_info": (
-        "Questions specifically about the process of company registration."
-        "This excludes broader questions about starting a business or similar processes."
-    ),
-    "get_licensing_info": (
-        "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
-        "This excludes questions about residence permits or licenses."
-    ),
+    # "get_tax_info": (
+    #     "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
+    # ),
+    # "get_contact_tool": (
+    #     "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
+    # ),
+    # "get_registration_info": (
+    #     "Questions specifically about the process of company registration."
+    #     "This excludes broader questions about starting a business or similar processes."
+    # ),
+    # "get_licensing_info": (
+    #     "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
+    #     "This excludes questions about residence permits or licenses."
+    # ),
     "websearch": (
-        "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
+        "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
     ),
     "retrieve": (
         "Questions broadly related to business, business planning, business opportunities, startups, entrepreneurship, employment, unemployment, pensions, insurance, social benefits, and similar topics"
@@ -766,4 +789,3 @@ workflow.add_edge("unrelated", "generate")
 
 # Compile app
 app = workflow.compile()
-
