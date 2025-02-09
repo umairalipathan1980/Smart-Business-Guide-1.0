@@ -1,13 +1,13 @@
-# Comment the first 3 statements if pysqlite3 error is encountered
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 from agentic_rag import initialize_app
 import sys
 import io
 import os
 import time
+import json
 
 
 # Configure the Streamlit page layout
@@ -25,7 +25,7 @@ if "messages" not in st.session_state:
 # Sidebar layout
 with st.sidebar:
     try:
-        st.image("images/LOGO_UPBEAT.jpg", width=150, use_container_width=True)
+        st.image("LOGO_UPBEAT.jpg", width=150, use_container_width=True)
     except Exception as e:
         st.warning("Unable to load image. Continuing without it.")
 
@@ -53,7 +53,8 @@ with st.sidebar:
         "mixtral-8x7b-32768", 
         "gemma2-9b-it",
         "gpt-4o-mini",
-        "gpt-4o"
+        "gpt-4o",
+        "deepseek-r1-distill-llama-70b"
     ]
 
     embed_list = [
@@ -93,7 +94,7 @@ with st.sidebar:
         answer_style = st.select_slider(
             "💬 Answer Style",
             options=["Concise", "Moderate", "Explanatory"],
-            value="Concise",
+            value="Explanatory",
             key="answer_style_slider",
             disabled=False
         )
@@ -109,7 +110,7 @@ with st.sidebar:
     internet_search = search_option == "Internet search only"
     
     reset_button = st.button("🔄 Reset Conversation", key="reset_button")
-
+    
     # Initialize the app with the selected model
     app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
     if reset_button:
@@ -143,8 +144,8 @@ for message in st.session_state.messages:
             st.markdown(f"**Assistant:** {message['content']}")
 
 # Input box at the bottom for new messages
-if user_input := st.chat_input("Type your question (Max. 150 char):"):
-    if len(user_input) > 150:
+if user_input := st.chat_input("Type your question (Max. 200 char):"):
+    if len(user_input) > 200:
         st.error("Your question exceeds 100 characters. Please shorten it and try again.")
     else:
         # Add user's message to session state and display it
