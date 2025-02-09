@@ -527,7 +527,7 @@ def web_search(state):
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
             query=question,
-            search_depth="basic",
+            search_depth="basic", #can be switched to 'advanced' mode that requires 2 credits per search.
             max_tokens=4000,
             max_results = 10,
             include_domains = [
