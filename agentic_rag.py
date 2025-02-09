@@ -266,7 +266,7 @@ def initialize_router_llm(selected_routing_model):
 def initialize_grading_llm(selected_grading_model):
     if "grader_llm" not in st.session_state or st.session_state.grader_llm.model_name != selected_grading_model:
         if "gpt-" in selected_grading_model:
-            st.session_state.grader_llm = ChatOpenAI(model=selected_grading_model, temperature=0.0)
+            st.session_state.grader_llm = ChatOpenAI(model=selected_grading_model, temperature=0.0, max_tokens = 16000)
         else:
             st.session_state.grader_llm = ChatGroq(model=selected_grading_model, temperature=0.0)
     
