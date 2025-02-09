@@ -545,7 +545,8 @@ def web_search(state):
                 "infofinland.fi",
                 "ely-keskus.fi",
                 "yritystulkki.fi",
-                "tem.fi"
+                "tem.fi",
+                "prh.fi"
                 ],
         )
         # Handle different types of results
