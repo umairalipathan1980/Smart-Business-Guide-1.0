@@ -679,6 +679,8 @@ def route_question(state):
         return "websearch"
 
     tool_selection = {
+
+    #### I have currently disabled these tools and am using only websearch. For using these tools with the websearch, uncomment the following statements and comment the next "websearch" statement.
     # "get_tax_info": (
     #     "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
     # ),
@@ -693,6 +695,10 @@ def route_question(state):
     #     "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
     #     "This excludes questions about residence permits or licenses."
     # ),
+    # "websearch": (
+    #     "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
+    # ),
+        
     "websearch": (
         "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
     ),
