@@ -331,6 +331,7 @@ rag_prompt = PromptTemplate(
                     - Ensure that you create two separate sections if and only if the context contain documents with two different 'page_content': 'Smart guide results:' and 'Internet search results:'.
                     - Do not create two different sections or mention 'Smart guide results:' or 'Internet search results:' in your response if the context does not contain documents with two different 'page_content': 'Smart guide results:' and 'Internet search results:'.
                     - Always include the document with 'page_content' of 'Internet search results:' in your response.
+                    - If answer style = "Explanatory", both the sections should be detailed and should contain all the points relevant to the question.
                 7. **Integrity and Trustworthiness**:
                 - Ensure every part of your response complies with these rules.
 
