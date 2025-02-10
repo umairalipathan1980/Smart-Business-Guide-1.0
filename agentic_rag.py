@@ -318,7 +318,7 @@ rag_prompt = PromptTemplate(
                 - If there are discrepancies in the context, clearly explain them.
 
                 5. **Citation Rules**:
-                - Citation information may be present in the context in the form of [document name, page number] or URLs. It is very important to cite references if you find them in the context.
+                # - Citation information may be present in the context in the form of [document name, page number] or URLs. It is very important to cite references if you find them in the context.
                 - For responses based on the context documents containing 'page_content' field of 'Smart guide results:', cite the document name and page number with each piece of information in the format: [document_name, page xx].
                 - For the answer compiled from the context from multiple documents, use the format: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...].
                 - For responses based on the documents containing the 'page_content' field of 'Internet search results:', include all the URLs in hyperlink form returned by the websearch, each on a new line. **very important**: The URLs should be labelled with the website name. 
