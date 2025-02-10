@@ -161,7 +161,6 @@ def load_or_create_vs(persist_directory):
     return vectorstore
 
 
-
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
@@ -321,7 +320,7 @@ rag_prompt = PromptTemplate(
                 # - Citation information may be present in the context in the form of [document name, page number] or URLs. It is very important to cite references if you find them in the context.
                 - For responses based on the context documents containing 'page_content' field of 'Smart guide results:', cite the document name and page number with each piece of information in the format: [document_name, page xx].
                 - For the answer compiled from the context from multiple documents, use the format: document_name 1 [page xx, yy, zz, ...], document_name 2 [page xx, yy, zz, ...].
-                - For responses based on the documents containing the 'page_content' field of 'Internet search results:', include all the URLs in hyperlink form returned by the websearch, each on a new line. **very important**: The URLs should be labelled with the website name. 
+                - For responses based on the documents containing the 'page_content' field of 'Internet search results:', include all the URLs in hyperlink form returned by the websearch. **very important**: The URLs should be labelled with the website name. 
                 - Do not invent any citation or URL. Only use the citation or URL in the context. 
 
                 6. **Hybrid Context Handling**:
@@ -397,8 +396,6 @@ def grade_documents(state):
 
     web_search_needed = "Yes" if not filtered_docs else "No"
     return {"documents": filtered_docs, "question": question, "web_search_needed": web_search_needed}
-
-
 
 def route_after_grading(state):
     web_search_needed = state.get("web_search_needed", "No")
