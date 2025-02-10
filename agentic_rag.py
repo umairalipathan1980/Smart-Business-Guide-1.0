@@ -216,9 +216,9 @@ def initialize_llm(model_name, answer_style):
         if answer_style == "Concise":
             temperature = 0.0
         elif answer_style == "Moderate":
-            temperature = 0.2
+            temperature = 0.0
         elif answer_style == "Explanatory":
-            temperature = 0.4
+            temperature = 0.0
 
         if "gpt-" in model_name:
             st.session_state.llm = ChatOpenAI(model=model_name, temperature=temperature)
