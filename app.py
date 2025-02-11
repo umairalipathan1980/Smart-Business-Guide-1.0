@@ -2,28 +2,85 @@
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
-from agentic_rag import initialize_app
 import sys
 import io
-import os
 import time
-import json
+from agentic_rag import initialize_app
+from langchain_openai import ChatOpenAI
 
+# -------------------- Initialization --------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "followup_key" not in st.session_state:
+    st.session_state.followup_key = 0
+if "pending_followup" not in st.session_state:
+    st.session_state.pending_followup = None
+if "last_assistant" not in st.session_state:
+    st.session_state.last_assistant = None
+if "followup_questions" not in st.session_state:
+    st.session_state.followup_questions = []
 
-# Configure the Streamlit page layout
+# -------------------- Helper Functions --------------------
+def get_followup_questions(last_user, last_assistant):
+    """
+    Generate three concise follow-up questions dynamically based on the latest conversation.
+    """
+    prompt = f"""Based on the conversation below:
+        User: {last_user}
+        Assistant: {last_assistant}
+        Generate three concise follow-up questions that a user might ask next.
+        Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
+        Follow-up Questions:"""
+    response = st.session_state.llm.invoke(prompt)
+    text = response.content if hasattr(response, "content") else str(response)
+    questions = [q.strip() for q in text.split('\n') if q.strip()]
+    return questions[:3]
+
+def process_question(question, answer_style):
+    """
+    Process a question (typed or follow-up):
+      1. Append as a user message.
+      2. Run the RAG workflow (via app.stream).
+      3. Stream and append the assistant's response.
+    """
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(f"**You:** {question}")
+    
+    output_buffer = io.StringIO()
+    sys.stdout = output_buffer
+    assistant_response = ""
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        debug_placeholder = st.empty()
+        with st.spinner("Thinking..."):
+            inputs = {
+                "question": question,
+                "hybrid_search": st.session_state.hybrid_search,
+                "internet_search": st.session_state.internet_search,
+                "answer_style": answer_style
+            }
+            for i, output in enumerate(app.stream(inputs)):
+                debug_logs = output_buffer.getvalue()
+                debug_placeholder.text_area("Debug Logs", debug_logs, height=100, key=f"debug_logs_{i}")
+                if "generate" in output and "generation" in output["generate"]:
+                    assistant_response += output["generate"]["generation"]
+                    response_placeholder.markdown(f"**Assistant:** {assistant_response}")
+    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+    sys.stdout = sys.__stdout__
+    st.session_state.followup_key += 1
+
+# -------------------- Page Layout & Configuration --------------------
 st.set_page_config(
     page_title="Smart Business Guide",
     layout="wide",
     initial_sidebar_state="expanded",
-    page_icon = "🧠"
+    page_icon="🧠"
 )
 
-# Initialize session state for messages
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Sidebar layout
+# -------------------- Sidebar --------------------
 with st.sidebar:
     try:
         st.image("images/LOGO_UPBEAT.jpg", width=150, use_container_width=True)
@@ -33,31 +90,27 @@ with st.sidebar:
     st.title("🗣️ Smart Guide 1.0")
     st.markdown("**▶️ Actions:**")
 
-    # Initialize session state for the model if it doesn't exist
+    # Set default model selections if not present.
     if "selected_model" not in st.session_state:
         st.session_state.selected_model = "gpt-4o"
-
     if "selected_routing_model" not in st.session_state:
         st.session_state.selected_routing_model = "gpt-4o"
-
     if "selected_grading_model" not in st.session_state:
         st.session_state.selected_grading_model = "gpt-4o"
-
     if "selected_embedding_model" not in st.session_state:
         st.session_state.selected_embedding_model = "text-embedding-3-large"
 
     model_list = [
         "llama-3.1-8b-instant",
         "llama-3.3-70b-versatile",
-        "llama3-70b-8192",   
-        "llama3-8b-8192", 
-        "mixtral-8x7b-32768", 
+        "llama3-70b-8192",
+        "llama3-8b-8192",
+        "mixtral-8x7b-32768",
         "gemma2-9b-it",
         "gpt-4o-mini",
         "gpt-4o",
         "deepseek-r1-distill-llama-70b"
     ]
-
     embed_list = [
         "text-embedding-3-large",
         "sentence-transformers/all-MiniLM-L6-v2"
@@ -70,53 +123,66 @@ with st.sidebar:
             key="model_selector",
             index=model_list.index(st.session_state.selected_model)
         )
-
         st.session_state.selected_routing_model = st.selectbox(
             "📡 Select Routing LLM",
             model_list,
             key="routing_model_selector",
             index=model_list.index(st.session_state.selected_routing_model)
         )
-
         st.session_state.selected_grading_model = st.selectbox(
             "🧮 Select Retrieval Grading LLM",
             model_list,
             key="grading_model_selector",
             index=model_list.index(st.session_state.selected_grading_model)
         )
-
         st.session_state.selected_embedding_model = st.selectbox(
             "🧠 Select Embedding Model",
             embed_list,
             key="embedding_model_selector",
             index=embed_list.index(st.session_state.selected_embedding_model)
         )
-        # Add the slider for answer style
         answer_style = st.select_slider(
             "💬 Answer Style",
             options=["Concise", "Moderate", "Explanatory"],
             value="Explanatory",
-            key="answer_style_slider",
-            disabled=False
+            key="answer_style_slider"
         )
+        st.session_state.answer_style = answer_style
 
     search_option = st.radio(
         "Search options",
         ["Smart guide + tools", "Internet search only", "Hybrid search (Guides + internet)"],
         index=0
     )
-
-    # Set the corresponding boolean values based on the selected option
-    hybrid_search = search_option == "Hybrid search (Guides + internet)"
-    internet_search = search_option == "Internet search only"
+    st.session_state.hybrid_search = (search_option == "Hybrid search (Guides + internet)")
+    st.session_state.internet_search = (search_option == "Internet search only")
     
-    reset_button = st.button("🔄 Reset Conversation", key="reset_button")
-    
-    # Initialize the app with the selected model
-    app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
-    if reset_button:
+    if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
-# Title
+
+    # Initialize your RAG workflow here.
+    app = initialize_app(
+        st.session_state.selected_model,
+        st.session_state.selected_embedding_model,
+        st.session_state.selected_routing_model,
+        st.session_state.selected_grading_model,
+        st.session_state.hybrid_search,
+        st.session_state.internet_search,
+        st.session_state.answer_style
+    )
+    
+    # (Optional) Initialize your primary LLM if needed.
+    # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
+
+# -------------------- Process a Pending Follow-Up (if any) --------------------
+# Now that `app` is defined, process any pending follow-up.
+if st.session_state.pending_followup is not None:
+    question = st.session_state.pending_followup
+    st.session_state.pending_followup = None  # Clear to ensure one-time processing.
+    process_question(question, st.session_state.answer_style)
+    st.rerun()  # Rerun the app to update the conversation state.
+
+# -------------------- Main Title & Introduction --------------------
 st.title("📘 Smart Guide for Entrepreneurship and Business Planning in Finland")
 st.markdown(
     """
@@ -124,18 +190,18 @@ st.markdown(
         🤖 <b>Welcome to your Smart Business Guide!</b><br>
         I am here to assist you with:<br>
         <ul style="list-style-position: inside; text-align: left; display: inline-block;">
-            <li>AI agents based approach for finding answers from business and entrepreneurship guides in Finland</li>
-            <li>Providing up-to-date information through AI-based internet search</li>
-            <li>Automatically invoking AI-based internet search based on query understanding </li>
-            <li>Specialized tools for tax-related information, permits & licenses, business registration, residence permits, etc. :</li>
+            <li>Finding answers from business and entrepreneurship guides in Finland</li>
+            <li>Providing up-to-date information via AI-based internet search</li>
+            <li>Automatically triggering search based on your query</li>
+            <li>Specialized tools for tax-related info, permits, registrations, and more</li>
         </ul>
-        <p style="margin-top: 10px;"><b>Start by typing your question in the chat below, and I'll provide tailored answers for your business needs!</b></p>
+        <p style="margin-top: 10px;"><b>Start by typing your question in the chat below!</b></p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-# Display conversation history
+# -------------------- Display Conversation History --------------------
 for message in st.session_state.messages:
     if message["role"] == "user":
         with st.chat_message("user"):
@@ -144,54 +210,257 @@ for message in st.session_state.messages:
         with st.chat_message("assistant"):
             st.markdown(f"**Assistant:** {message['content']}")
 
-# Input box at the bottom for new messages
-if user_input := st.chat_input("Type your question (Max. 200 char):"):
+# -------------------- Process New User Input --------------------
+user_input = st.chat_input("Type your question (Max. 200 char):")
+if user_input:
     if len(user_input) > 200:
-        st.error("Your question exceeds 100 characters. Please shorten it and try again.")
+        st.error("Your question exceeds 200 characters. Please shorten it and try again.")
     else:
-        # Add user's message to session state and display it
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(f"**You:** {user_input}")
+        process_question(user_input, st.session_state.answer_style)
+        st.rerun()
 
-        # Capture print statements from agentic_rag.py
-        output_buffer = io.StringIO()
-        sys.stdout = output_buffer  # Redirect stdout to the buffer
+# -------------------- Generate and Display Follow-Up Questions --------------------
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
+    last_assistant_message = st.session_state.messages[-1]["content"]
+    last_user_message = next(
+        (msg["content"] for msg in reversed(st.session_state.messages) if msg["role"] == "user"),
+        ""
+    )
+    if st.session_state.last_assistant != last_assistant_message:
+        st.session_state.last_assistant = last_assistant_message
+        st.session_state.followup_questions = get_followup_questions(last_user_message, last_assistant_message)
+    
+    st.markdown("#### Related:")
+    for i, question in enumerate(st.session_state.followup_questions):
+        if st.button(question, key=f"followup_{i}_{st.session_state.followup_key}"):
+            st.session_state.pending_followup = question
+            st.rerun()
 
-        try:
-            with st.chat_message("assistant"):
-                response_placeholder = st.empty()
-                debug_placeholder = st.empty()
-                streamed_response = ""
 
-                # Show spinner while streaming the response
-                with st.spinner("Thinking..."):
-                    #inputs = {"question": user_input}
-                    inputs = {"question": user_input, "hybrid_search": hybrid_search, "internet_search":internet_search, "answer_style":answer_style}
-                    for i, output in enumerate(app.stream(inputs)):
-                        # Capture intermediate print messages
-                        debug_logs = output_buffer.getvalue()
-                        debug_placeholder.text_area(
-                            "Debug Logs",
-                            debug_logs,
-                            height=100,
-                            key=f"debug_logs_{i}"
-                        )
 
-                        if "generate" in output and "generation" in output["generate"]:
-                            # Append new content to streamed response
-                            streamed_response += output["generate"]["generation"]
-                            # Update the placeholder with the streamed response so far
-                            response_placeholder.markdown(f"**Assistant:** {streamed_response}")
 
-                # Store the final response in session state
-                st.session_state.messages.append({"role": "assistant", "content": streamed_response or "No response generated."})
-        except Exception as e:
-            # Handle errors and display in the conversation history
-            error_message = f"An error occurred: {e}"
-            st.session_state.messages.append({"role": "assistant", "content": error_message})
-            with st.chat_message("assistant"):
-                st.error(error_message)
-        finally:
-            # Restore stdout to its original state
-            sys.stdout = sys.__stdout__
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import streamlit as st
+# from agentic_rag import initialize_app
+# import sys
+# import io
+# import os
+# import time
+# import json
+
+
+# # Configure the Streamlit page layout
+# st.set_page_config(
+#     page_title="Smart Business Guide",
+#     layout="wide",
+#     initial_sidebar_state="expanded",
+#     page_icon = "🧠"
+# )
+
+# # Initialize session state for messages
+# if "messages" not in st.session_state:
+#     st.session_state.messages = []
+
+# # Sidebar layout
+# with st.sidebar:
+#     try:
+#         st.image("images/LOGO_UPBEAT.jpg", width=150, use_container_width=True)
+#     except Exception as e:
+#         st.warning("Unable to load image. Continuing without it.")
+
+#     st.title("🗣️ Smart Guide 1.0")
+#     st.markdown("**▶️ Actions:**")
+
+#     # Initialize session state for the model if it doesn't exist
+#     if "selected_model" not in st.session_state:
+#         st.session_state.selected_model = "gpt-4o"
+
+#     if "selected_routing_model" not in st.session_state:
+#         st.session_state.selected_routing_model = "gpt-4o"
+
+#     if "selected_grading_model" not in st.session_state:
+#         st.session_state.selected_grading_model = "gpt-4o"
+
+#     if "selected_embedding_model" not in st.session_state:
+#         st.session_state.selected_embedding_model = "text-embedding-3-large"
+
+#     model_list = [
+#         "llama-3.1-8b-instant",
+#         "llama-3.3-70b-versatile",
+#         "llama3-70b-8192",   
+#         "llama3-8b-8192", 
+#         "mixtral-8x7b-32768", 
+#         "gemma2-9b-it",
+#         "gpt-4o-mini",
+#         "gpt-4o",
+#         "deepseek-r1-distill-llama-70b"
+#     ]
+
+#     embed_list = [
+#         "text-embedding-3-large",
+#         "sentence-transformers/all-MiniLM-L6-v2"
+#     ]
+
+#     with st.expander("⚙️ Settings", expanded=False):
+#         st.session_state.selected_model = st.selectbox(
+#             "🤖 Select Answering LLM",
+#             model_list,
+#             key="model_selector",
+#             index=model_list.index(st.session_state.selected_model)
+#         )
+
+#         st.session_state.selected_routing_model = st.selectbox(
+#             "📡 Select Routing LLM",
+#             model_list,
+#             key="routing_model_selector",
+#             index=model_list.index(st.session_state.selected_routing_model)
+#         )
+
+#         st.session_state.selected_grading_model = st.selectbox(
+#             "🧮 Select Retrieval Grading LLM",
+#             model_list,
+#             key="grading_model_selector",
+#             index=model_list.index(st.session_state.selected_grading_model)
+#         )
+
+#         st.session_state.selected_embedding_model = st.selectbox(
+#             "🧠 Select Embedding Model",
+#             embed_list,
+#             key="embedding_model_selector",
+#             index=embed_list.index(st.session_state.selected_embedding_model)
+#         )
+#         # Add the slider for answer style
+#         answer_style = st.select_slider(
+#             "💬 Answer Style",
+#             options=["Concise", "Moderate", "Explanatory"],
+#             value="Explanatory",
+#             key="answer_style_slider",
+#             disabled=False
+#         )
+
+#     search_option = st.radio(
+#         "Search options",
+#         ["Smart guide + tools", "Internet search only", "Hybrid search (Guides + internet)"],
+#         index=0
+#     )
+
+#     # Set the corresponding boolean values based on the selected option
+#     hybrid_search = search_option == "Hybrid search (Guides + internet)"
+#     internet_search = search_option == "Internet search only"
+    
+#     reset_button = st.button("🔄 Reset Conversation", key="reset_button")
+    
+#     # Initialize the app with the selected model
+#     app = initialize_app(st.session_state.selected_model, st.session_state.selected_embedding_model, st.session_state.selected_routing_model, st.session_state.selected_grading_model, hybrid_search, internet_search, answer_style)
+#     if reset_button:
+#         st.session_state.messages = []
+# # Title
+# st.title("📘 Smart Guide for Entrepreneurship and Business Planning in Finland")
+# st.markdown(
+#     """
+#     <div style="text-align: left; font-size: 18px; margin-top: 20px; line-height: 1.6;">
+#         🤖 <b>Welcome to your Smart Business Guide!</b><br>
+#         I am here to assist you with:<br>
+#         <ul style="list-style-position: inside; text-align: left; display: inline-block;">
+#             <li>AI agents based approach for finding answers from business and entrepreneurship guides in Finland</li>
+#             <li>Providing up-to-date information through AI-based internet search</li>
+#             <li>Automatically invoking AI-based internet search based on query understanding </li>
+#             <li>Specialized tools for tax-related information, permits & licenses, business registration, residence permits, etc. :</li>
+#         </ul>
+#         <p style="margin-top: 10px;"><b>Start by typing your question in the chat below, and I'll provide tailored answers for your business needs!</b></p>
+#     </div>
+#     """,
+#     unsafe_allow_html=True
+# )
+
+# # Display conversation history
+# for message in st.session_state.messages:
+#     if message["role"] == "user":
+#         with st.chat_message("user"):
+#             st.markdown(f"**You:** {message['content']}")
+#     elif message["role"] == "assistant":
+#         with st.chat_message("assistant"):
+#             st.markdown(f"**Assistant:** {message['content']}")
+
+# # Input box at the bottom for new messages
+# if user_input := st.chat_input("Type your question (Max. 200 char):"):
+#     if len(user_input) > 200:
+#         st.error("Your question exceeds 100 characters. Please shorten it and try again.")
+#     else:
+#         # Add user's message to session state and display it
+#         st.session_state.messages.append({"role": "user", "content": user_input})
+#         with st.chat_message("user"):
+#             st.markdown(f"**You:** {user_input}")
+
+#         # Capture print statements from agentic_rag.py
+#         output_buffer = io.StringIO()
+#         sys.stdout = output_buffer  # Redirect stdout to the buffer
+
+#         try:
+#             with st.chat_message("assistant"):
+#                 response_placeholder = st.empty()
+#                 debug_placeholder = st.empty()
+#                 streamed_response = ""
+
+#                 # Show spinner while streaming the response
+#                 with st.spinner("Thinking..."):
+#                     #inputs = {"question": user_input}
+#                     inputs = {"question": user_input, "hybrid_search": hybrid_search, "internet_search":internet_search, "answer_style":answer_style}
+#                     for i, output in enumerate(app.stream(inputs)):
+#                         # Capture intermediate print messages
+#                         debug_logs = output_buffer.getvalue()
+#                         debug_placeholder.text_area(
+#                             "Debug Logs",
+#                             debug_logs,
+#                             height=100,
+#                             key=f"debug_logs_{i}"
+#                         )
+
+#                         if "generate" in output and "generation" in output["generate"]:
+#                             # Append new content to streamed response
+#                             streamed_response += output["generate"]["generation"]
+#                             # Update the placeholder with the streamed response so far
+#                             response_placeholder.markdown(f"**Assistant:** {streamed_response}")
+
+#                 # Store the final response in session state
+#                 st.session_state.messages.append({"role": "assistant", "content": streamed_response or "No response generated."})
+#         except Exception as e:
+#             # Handle errors and display in the conversation history
+#             error_message = f"An error occurred: {e}"
+#             st.session_state.messages.append({"role": "assistant", "content": error_message})
+#             with st.chat_message("assistant"):
+#                 st.error(error_message)
+#         finally:
+#             # Restore stdout to its original state
+#             sys.stdout = sys.__stdout__
