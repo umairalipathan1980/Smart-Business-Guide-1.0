@@ -677,28 +677,10 @@ def route_question(state):
 
     tool_selection = {
 
-    #### I have currently disabled these tools and am using only websearch. For using these tools with the websearch, uncomment the following statements and comment the next "websearch" statement.
-    # "get_tax_info": (
-    #     "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
-    # ),
-    # "get_contact_tool": (
-    #     "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
-    # ),
-    # "get_registration_info": (
-    #     "Questions specifically about the process of company registration."
-    #     "This excludes broader questions about starting a business or similar processes."
-    # ),
-    # "get_licensing_info": (
-    #     "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
-    #     "This excludes questions about residence permits or licenses."
-    # ),
-    # "websearch": (
-    #     "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
-    # ),
-        
     "websearch": (
-        "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
+        "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
     ),
+
     "retrieve": (
         "Questions broadly related to business, business planning, business opportunities, startups, entrepreneurship, employment, unemployment, pensions, insurance, social benefits, and similar topics"
         "This includes questions about specific business opportunities (e.g., for specific expertise, area, topic) or suggestions. "
