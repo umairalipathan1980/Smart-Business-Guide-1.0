@@ -1,9 +1,9 @@
 # Smart Business Guide 1.0
-
+***Read the full article on the development of this smart guide in [this link of Towards Data Science](https://towardsdatascience.com/developing-an-ai-powered-smart-guide-for-business-planning-entrepreneurship-ea1bc328ff01/)***.
 ### Overview
 The **Smart Business Guide 1.0** is an AI-powered solution for entrepreneurship and business planning in Finland, built on advanced **Agentic RAG** using LangChain and LangGraph frameworks. It uses advanced retrieval-augmented generation workflows to provide precise responses to user queries.
 
-**Update:** The current version of app.py is using "*agentic_rag.py*" which does not uses web scraping tools. To use the version of the web scraping tools, replace:  
+**Update:** The current version of *app.py* is using "*agentic_rag.py*" which does not uses web scraping tools. To use the version of the web scraping tools, replace:  
 
 ```
 from agentic_rag import initialize_app
