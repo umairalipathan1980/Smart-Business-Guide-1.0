@@ -7,7 +7,7 @@ import streamlit as st
 import sys
 import io
 import time
-from agentic_rag_with_tools import initialize_app
+from agentic_rag import initialize_app
 from langchain_openai import ChatOpenAI
 
 # -------------------- Initialization --------------------
