@@ -420,27 +420,6 @@ def format_documents(documents):
     """Format documents into a single string for context."""
     return "\n\n".join(doc.page_content for doc in documents)
 
-# def generate(state):
-#     question = state["question"]
-#     documents = state.get("documents", [])
-#     answer_style = state.get("answer_style", "Concise")
-
-#     if "llm" not in st.session_state:
-#         st.session_state.llm = initialize_llm(st.session_state.selected_model, answer_style)
-
-#     rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
-
-#     if not documents:
-#         print("No documents available for generation.")
-#         return {"generation": "No relevant documents found.", "documents": documents, "question": question}
-
-#     context = documents
-
-#     generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style})
-    
-#     return {"documents": documents, "question": question, "generation": generation}
-
-
 def generate(state):
     question = state["question"]
     documents = state.get("documents", [])
@@ -529,7 +508,6 @@ def hybrid_search(state):
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
 
-#@st.cache_data
 def web_search(state):
     if "tavily_client" not in st.session_state:
         st.session_state.tavily_client = TavilyClient()
@@ -578,107 +556,6 @@ def web_search(state):
         documents.append(Document(page_content=f"Web search failed: {e}"))
     return {"documents": documents, "question": question}
 
-def get_contact_tool(state):
-    """
-    Execute the 'get_contact_info' tool to fetch information.
-    """
-    contact_urls = [
-        'https://migri.fi/en/contact-information',
-        'https://migri.fi/en/communications'
-    ]
-    question = state["question"]
-    documents = state.get("documents", [])
-    try:
-        contact_info = get_info(contact_urls)
-        web_results_doc = Document(page_content=contact_info)
-        documents.append(web_results_doc)
-        return {
-            "generation": contact_info,
-            "documents": documents,
-            "question": question
-        }
-    except Exception as e:
-        return {
-            "generation": f"Error fetching contact information: {e}",
-            "documents": [],
-            "question": question
-        }
-
-def get_tax_info(state):
-    """
-    Execute the 'get_contact_info' tool to fetch information.
-    """
-    tax_rates_url = [
-        'https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/rates-of-vat/',
-        'https://www.expat-finland.com/living_in_finland/tax.html?utm_source=chatgpt.com',
-        'https://finlandexpat.com/tax-in-finland/?utm_source=chatgpt.com'
-    ]
-    question = state["question"]
-    documents = state.get("documents", [])
-    try:
-        tax_info = get_info(tax_rates_url)
-        web_results_doc = Document(page_content=tax_info)
-        documents.append(web_results_doc)
-        return {
-            "generation": tax_info,
-            "documents": documents,
-            "question": question
-        }
-    except Exception as e:
-        return {
-            "generation": f"Error fetching contact information: {e}",
-            "documents": [],
-            "question": question
-        }
-
-def get_registration_info(state):
-    """
-    Execute the 'get_contact_info' tool to fetch information.
-    """
-    reg_links = ['https://www.suomi.fi/company/starting-a-business/forms-of-enterprise/guide/choosing-the-form-of-business/company-registration']
-    question = state["question"]
-    documents = state.get("documents", [])
-    try:
-        reg_info = get_info(reg_links)
-        web_results_doc = Document(page_content=reg_info)
-        documents.append(web_results_doc)
-        return {
-            "generation": reg_info,
-            "documents": documents,
-            "question": question
-        }
-    except Exception as e:
-        return {
-            "generation": f"Error fetching contact information: {e}",
-            "documents": [],
-            "question": question
-        }
-
-def get_licensing_info(state):
-    """
-    Execute the 'get_contact_info' tool to fetch information.
-    """
-    licenses = [
-    'https://www.suomi.fi/company/starting-a-business/foreign-entrepreneurs/guide/licenses-and-notifications-required-of-foreign-entrepreneurs',
-    'https://yritystulkki.fi/fi/alue/oulu/english/industries_requiring_license/'
-    ]
-    question = state["question"]
-    documents = state.get("documents", [])
-    try:
-        licenses_info = get_info(licenses)
-        web_results_doc = Document(page_content=licenses_info)
-        documents.append(web_results_doc)
-        return {
-            "generation": licenses_info,
-            "documents": documents,
-            "question": question
-        }
-    except Exception as e:
-        return {
-            "generation": f"Error fetching contact information: {e}",
-            "documents": [],
-            "question": question
-        }
 
 # # Router function
 def route_question(state):
@@ -693,26 +570,6 @@ def route_question(state):
         return "websearch"
 
     tool_selection = {
-
-    #### I have currently disabled these tools and am using only websearch. For using these tools with the websearch, uncomment the following statements and comment the next "websearch" statement.
-    # "get_tax_info": (
-    #     "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
-    # ),
-    # "get_contact_tool": (
-    #     "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
-    # ),
-    # "get_registration_info": (
-    #     "Questions specifically about the process of company registration."
-    #     "This excludes broader questions about starting a business or similar processes."
-    # ),
-    # "get_licensing_info": (
-    #     "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
-    #     "This excludes questions about residence permits or licenses."
-    # ),
-    # "websearch": (
-    #     "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
-    # ),
-        
     "websearch": (
         "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
     ),
@@ -771,10 +628,6 @@ workflow.add_node("grade_documents", grade_documents)
 workflow.add_node("route_after_grading", route_after_grading)
 workflow.add_node("websearch", web_search)
 workflow.add_node("generate", generate)
-# workflow.add_node("get_contact_tool", get_contact_tool)
-# workflow.add_node("get_tax_info", get_tax_info)
-# workflow.add_node("get_registration_info", get_registration_info)
-# workflow.add_node("get_licensing_info", get_licensing_info)
 workflow.add_node("hybrid_search", hybrid_search)
 workflow.add_node("unrelated", handle_unrelated)
 
@@ -784,10 +637,6 @@ workflow.set_conditional_entry_point(
     {
         "retrieve": "retrieve",
         "websearch": "websearch",
-        # "get_contact_tool": "get_contact_tool",
-        # "get_tax_info": "get_tax_info",
-        # "get_registration_info": "get_registration_info",
-        # "get_licensing_info": "get_licensing_info",
         "hybrid_search": "hybrid_search",
         "unrelated": "unrelated"
     },
@@ -801,10 +650,6 @@ workflow.add_conditional_edges(
     {"websearch": "websearch", "generate": "generate"},
 )
 workflow.add_edge("websearch", "generate")
-# workflow.add_edge("get_contact_tool", "generate")
-# workflow.add_edge("get_tax_info", "generate")
-# workflow.add_edge("get_registration_info", "generate")
-# workflow.add_edge("get_licensing_info", "generate")
 workflow.add_edge("hybrid_search", "generate")
 workflow.add_edge("unrelated", "generate")
 
