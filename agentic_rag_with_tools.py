@@ -676,7 +676,20 @@ def route_question(state):
         return "websearch"
 
     tool_selection = {
-
+    "get_tax_info": (
+        "Questions specifically related to tax matters, including current tax rates, taxation rules, taxable incomes, tax exemptions, the tax filing process, or similar topics. "
+    ),
+    "get_contact_tool": (
+        "Questions specifically asking for the contact information of the Finnish Immigration Service (Migri). "
+    ),
+    "get_registration_info": (
+        "Questions specifically about the process of company registration."
+        "This excludes broader questions about starting a business or similar processes."
+    ),
+    "get_licensing_info": (
+        "Questions related to licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs. "
+        "This excludes questions about residence permits or licenses."
+    ),
     "websearch": (
         "Questions related to residence permits, visas, moving to Finland, or those requiring current statistics or real-time information. "
     ),
