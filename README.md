@@ -84,3 +84,9 @@ Ideal for entrepreneurs, business owners, and professionals seeking actionable a
    LANGCHAIN_API_KEY = "your_LangChain_API_key" # get a free API key from LangSmith
    OPENAI_API_KEY = "your_OpenAI_API_KEY" # (optional) for OpenAI models
    ```
+**For running the code locally, comment the following lines. These lines were added to run the code on Streamlit**
+```
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+```
