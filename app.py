@@ -170,7 +170,7 @@ with st.sidebar:
 
     search_option = st.radio(
         "Search options",
-        ["Smart guide + tools", "Internet search only", "Hybrid search (Guides + internet)"],
+        ["Reliable documents", "Reliable web sources", "Reliable docs & web sources"],
         index=0
     )
     st.session_state.hybrid_search = (search_option == "Hybrid search (Guides + internet)")
