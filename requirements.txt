@@ -17,7 +17,3 @@ langchain-openai
 pydantic
 streamlit
 chromadb
-pysqlite3-binary
-
-
-

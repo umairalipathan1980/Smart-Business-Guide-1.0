@@ -1,49 +1,49 @@
 
 import os
+
 import streamlit as st
+
 # Set up environment variables
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+# os.environ["LANGCHAIN_TRACING_V2"] = "true"
+# os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 os.environ["USER_AGENT"] = "AgenticRAG/1.0" 
 os.environ["TAVILY_API_KEY"]=st.secrets["TAVILY_API_KEY"]
 os.environ["GROQ_API_KEY"]=st.secrets["GROQ_API_KEY"]
-os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+# os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_ollama import OllamaEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import logging
+import re
+import sys
+import warnings
+from typing import List
+
+import requests
+import spacy
+from bs4 import BeautifulSoup
 from langchain import hub
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_ollama import ChatOllama
-from langgraph.graph import END, StateGraph
+from langchain.chains import RetrievalQA
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import FlashrankRerank
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import (UnstructuredMarkdownLoader,
+                                                  WebBaseLoader)
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.documents import Document
-from typing_extensions import TypedDict
-from typing import List
-from PyPDF2 import PdfReader
-from tavily import TavilyClient
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_groq.chat_models import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
-import re
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
-from sentence_transformers import SentenceTransformer, util
-import spacy
-import warnings
-import logging
-from langchain.chains import RetrievalQA
-import sys
-from langchain.retrievers.document_compressors import FlashrankRerank
-from langchain.retrievers import ContextualCompressionRetriever
-import requests
-from bs4 import BeautifulSoup
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
-from langchain_openai import OpenAIEmbeddings
+from PyPDF2 import PdfReader
+from sentence_transformers import SentenceTransformer, util
+from tavily import TavilyClient
+from typing_extensions import TypedDict
 
 ########################Resolve or suppress warnings
 # Set global logging level to ERROR
@@ -219,9 +219,9 @@ def initialize_llm(model_name, answer_style):
             temperature = 0.0
 
         if "gpt-" in model_name:
-            st.session_state.llm = ChatOpenAI(model=model_name, temperature=temperature)
+            st.session_state.llm = ChatOpenAI(model=model_name, temperature=temperature, streaming=True)
         else:
-            st.session_state.llm = ChatGroq(model=model_name, temperature=temperature)
+            st.session_state.llm = ChatGroq(model=model_name, temperature=temperature, streaming=True)
 
     return st.session_state.llm
 

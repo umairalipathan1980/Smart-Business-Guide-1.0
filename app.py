@@ -1,14 +1,21 @@
 
-__import__('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+import io
 import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import time
 
 import streamlit as st
-import sys
-import io
-import time
-from agentic_rag import initialize_app
+import torch
 from langchain_openai import ChatOpenAI
+
+from agentic_rag import initialize_app
+from st_callback import get_streamlit_cb
+
+torch.classes.__path__ = [] # Fix for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+# TODO: Bug fix App crashes when selecting "llama-3.1-8b-instant" model.
 
 # -------------------- Initialization --------------------
 if "messages" not in st.session_state:
@@ -40,46 +47,67 @@ def get_followup_questions(last_user, last_assistant):
 
 def process_question(question, answer_style):
     """
-    Process a question (typed or follow-up):
-      1. Append as a user message.
-      2. Run the RAG workflow (via app.stream).
-      3. Stream and append the assistant's response.
+    Processes a question with streaming support.
+    1. Appends the user's message.
+    2. Streams the assistant's response using get_streamlit_cb.
+    3. Updates the assistant's message in session_state with the final response.
     """
+    # Append the user's message
     st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.markdown(f"**You:** {question}")
-    
-    output_buffer = io.StringIO()
-    sys.stdout = output_buffer
-    assistant_response = ""
+
+    # Create an empty assistant message if the previous one isn't already empty
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant" and st.session_state.messages[-1]["content"] == "":
+        assistant_index = len(st.session_state.messages) - 1
+    else:
+        st.session_state.messages.append({"role": "assistant", "content": ""})
+        assistant_index = len(st.session_state.messages) - 1
+
     with st.chat_message("assistant"):
-        response_placeholder = st.empty()
+        stream_container = st.empty()  # Container to display streaming output
+        st_callback = get_streamlit_cb(stream_container)
         debug_placeholder = st.empty()
+
         with st.spinner("Thinking..."):
-            inputs = {
-                "question": question,
-                "hybrid_search": st.session_state.hybrid_search,
-                "internet_search": st.session_state.internet_search,
-                "answer_style": answer_style
-            }
-            for i, output in enumerate(app.stream(inputs)):
-                debug_logs = output_buffer.getvalue()
-                debug_placeholder.text_area("Debug Logs", debug_logs, height=100, key=f"debug_logs_{i}")
-                if "generate" in output and "generation" in output["generate"]:
-                    assistant_response += output["generate"]["generation"]
-                    # Process the response to add styling to references
-                    import re
-                    styled_response = re.sub(
-                        r'\[(.*?)\]',
-                        r'<span class="reference">[\1]</span>',
-                        assistant_response
-                    )
-                    response_placeholder.markdown(
-                        f"**Assistant:** {styled_response}",
-                        unsafe_allow_html=True
-                    )
-    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-    sys.stdout = sys.__stdout__
+            try:
+                inputs = {
+                    "question": question,
+                    "hybrid_search": st.session_state.hybrid_search,
+                    "internet_search": st.session_state.internet_search,
+                    "answer_style": answer_style
+                }
+
+                # Redirect stdout to capture debug logs
+                output_buffer = io.StringIO()
+                old_stdout = sys.stdout
+                sys.stdout = output_buffer
+
+                try:
+                    # Correct enumeration: use idx and chunk
+                    for idx, chunk in enumerate(app.stream(inputs, config={"callbacks": [st_callback]})):
+                        debug_logs = output_buffer.getvalue()
+                        debug_placeholder.text_area(
+                            "Debug Logs",
+                            debug_logs,
+                            height=100,
+                            key=f"debug_logs_{idx}"
+                        )
+                finally:
+                    # Always restore stdout
+                    sys.stdout = old_stdout
+
+            except Exception as e:
+                error_msg = f"Error generating response: {str(e)}"
+                stream_container.error(error_msg)
+                st_callback.text = error_msg
+
+        # Retrieve the final response from the callback
+        final_response = st_callback.text
+        stream_container.markdown(f"**Assistant:** {final_response}", unsafe_allow_html=True)
+
+    # Update the assistant message in session_state
+    st.session_state.messages[assistant_index]["content"] = final_response
     st.session_state.followup_key += 1
 
 # -------------------- Page Layout & Configuration --------------------
@@ -250,22 +278,39 @@ if user_input:
 
 # -------------------- Generate and Display Follow-Up Questions --------------------
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
-    last_assistant_message = st.session_state.messages[-1]["content"]
-    last_user_message = next(
-        (msg["content"] for msg in reversed(st.session_state.messages) if msg["role"] == "user"),
-        ""
-    )
-    if st.session_state.last_assistant != last_assistant_message:
-        st.session_state.last_assistant = last_assistant_message
-        st.session_state.followup_questions = get_followup_questions(last_user_message, last_assistant_message)
-    
-    st.markdown("#### Related:")
-    for i, question in enumerate(st.session_state.followup_questions):
-        if st.button(question, key=f"followup_{i}_{st.session_state.followup_key}"):
-            st.session_state.pending_followup = question
-            st.rerun()
-
-
+    try:
+        last_assistant_message = st.session_state.messages[-1]["content"]
+        last_user_message = next(
+            (msg["content"] for msg in reversed(st.session_state.messages)
+             if msg["role"] == "user"),
+            ""
+        )
+        
+        # If the last assistant message is the "unrelated" response, do not generate follow-up questions
+        if "I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland." in last_assistant_message:
+            st.session_state.followup_questions = []
+        else:
+            # Generate new questions if the last assistant message has changed
+            if st.session_state.last_assistant != last_assistant_message:
+                print("Generating new followup questions")
+                st.session_state.last_assistant = last_assistant_message
+                st.session_state.followup_questions = get_followup_questions(
+                    last_user_message, 
+                    last_assistant_message
+                )
+        
+        # Display follow-up question buttons if any are available
+        if st.session_state.followup_questions:
+            st.markdown("#### Related:")
+            for i, question in enumerate(st.session_state.followup_questions):
+                button_key = f"followup_{i}_{st.session_state.followup_key}"
+                if st.button(question, key=button_key):
+                    print(f"Followup button {i} clicked: {question}")
+                    # Set pending follow-up without triggering an immediate rerun
+                    st.session_state.pending_followup = question
+                    # Do NOT call st.rerun() here
+    except Exception as e:
+        print(f"Error in followup section: {e}")
 
 
 
