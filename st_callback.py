@@ -24,7 +24,8 @@ def get_streamlit_cb(parent_container: DeltaGenerator) -> BaseCallbackHandler:
             self.text = initial_text
             self.reference_pattern = r'\[(.*?)\]'
             self.is_streaming = False
-
+            
+        # args and kwargs are not used in the following methods, but can be used to pass additional information
         def on_llm_start(self, *args, **kwargs) -> None:
             """Called when the LLM starts generating tokens."""
             self.is_streaming = True

@@ -13,7 +13,8 @@ from langchain_openai import ChatOpenAI
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
 
-torch.classes.__path__ = [] # Fix for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+# Fix for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+torch.classes.__path__ = []
 # TODO: Bug fix App crashes when selecting "llama-3.1-8b-instant" model.
 
 hardcoded_questions = [
@@ -35,20 +36,27 @@ if "followup_questions" not in st.session_state:
     st.session_state.followup_questions = []
 
 # -------------------- Helper Functions --------------------
+
+
 def get_followup_questions(last_user, last_assistant):
     """
     Generate three concise follow-up questions dynamically based on the latest conversation.
     """
-    prompt = f"""Based on the conversation below:
-        User: {last_user}
-        Assistant: {last_assistant}
-        Generate three concise follow-up questions that a user might ask next.
-        Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
-        Follow-up Questions:"""
-    response = st.session_state.llm.invoke(prompt)
-    text = response.content if hasattr(response, "content") else str(response)
-    questions = [q.strip() for q in text.split('\n') if q.strip()]
-    return questions[:3]
+    try:
+        prompt = f"""Based on the conversation below:
+            User: {last_user}
+            Assistant: {last_assistant}
+            Generate three concise follow-up questions that a user might ask next.
+            Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
+            Follow-up Questions:"""
+        response = st.session_state.llm.invoke(prompt)
+        text = response.content if hasattr(
+            response, "content") else str(response)
+        questions = [q.strip() for q in text.split('\n') if q.strip()]
+        return questions[:3]
+    except Exception as e:
+        print(f"Failed to generate follow-up questions: {e}")
+        return []
 
 def process_question(question, answer_style):
     # 1) Add user question to the chat
@@ -82,7 +90,8 @@ def process_question(question, answer_style):
                 # Process the question
                 for idx, chunk in enumerate(app.stream(inputs, config={"callbacks": [st_callback]})):
                     debug_logs = output_buffer.getvalue()
-                    debug_placeholder.text_area("Debug Logs", debug_logs, height=100, key=f"debug_logs_{idx}")
+                    debug_placeholder.text_area(
+                        "Debug Logs", debug_logs, height=100, key=f"debug_logs_{idx}")
                     if "generate" in chunk and "generation" in chunk["generate"]:
                         assistant_response += chunk["generate"]["generation"]
                         styled_response = re.sub(
@@ -105,6 +114,7 @@ def process_question(question, answer_style):
     # 3) Update the assistant message with the final response
     st.session_state.messages[assistant_index]["content"] = assistant_response
     st.session_state.followup_key += 1
+
 
 # -------------------- Page Layout & Configuration --------------------
 st.set_page_config(
@@ -194,12 +204,15 @@ with st.sidebar:
 
     search_option = st.radio(
         "Search options",
-        ["Reliable documents", "Reliable web sources", "Reliable docs & web sources"],
+        ["Reliable documents", "Reliable web sources",
+            "Reliable docs & web sources"],
         index=0
     )
-    st.session_state.hybrid_search = (search_option == "Hybrid search (Guides + internet)")
-    st.session_state.internet_search = (search_option == "Internet search only")
-    
+    st.session_state.hybrid_search = (
+        search_option == "Hybrid search (Guides + internet)")
+    st.session_state.internet_search = (
+        search_option == "Internet search only")
+
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
 
@@ -213,7 +226,7 @@ with st.sidebar:
         st.session_state.internet_search,
         st.session_state.answer_style
     )
-    
+
     # (Optional) Initialize your primary LLM if needed.
     # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
 
@@ -265,15 +278,19 @@ if st.session_state.pending_followup is not None:
 user_input = st.chat_input("Type your question (Max. 200 char):")
 if user_input:
     if len(user_input) > 200:
-        st.error("Your question exceeds 200 characters. Please shorten it and try again.")
+        st.error(
+            "Your question exceeds 200 characters. Please shorten it and try again.")
     else:
         process_question(user_input, st.session_state.answer_style)
         st.rerun()
 
 # -------------------- Helper function for Follow-Up --------------------
+
+
 def handle_followup(question: str):
     st.session_state.pending_followup = question
     st.rerun()
+
 
 # -------------------- Generate and Display Follow-Up Questions --------------------
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
@@ -284,7 +301,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
              if msg["role"] == "user"),
             ""
         )
-        
+
         # If the last assistant message is the "unrelated" response, do not generate follow-up questions
         if "I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland." in last_assistant_message:
             st.session_state.followup_questions = []
@@ -293,16 +310,22 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
             if st.session_state.last_assistant != last_assistant_message:
                 print("Generating new followup questions")
                 st.session_state.last_assistant = last_assistant_message
-                st.session_state.followup_questions = get_followup_questions(
-                    last_user_message, 
-                    last_assistant_message
-                )
-        
-        # Display follow-up question buttons if any are available
-        if st.session_state.followup_questions:
+                try:
+                    st.session_state.followup_questions = get_followup_questions(
+                        last_user_message,
+                        last_assistant_message
+                    )
+                except Exception as e:
+                    print(f"Failed to generate followup questions: {e}")
+                    # Reset followup questions on error
+                    st.session_state.followup_questions = []
+
+        # Display follow-up question buttons only if list is not empty
+        if st.session_state.followup_questions and len(st.session_state.followup_questions) > 0:
             st.markdown("#### Related:")
             for i, question in enumerate(st.session_state.followup_questions):
-                clean_question = re.sub(r'^\d+\.\s*', '', question) # Remove numbering e.g "1. "
+                # Remove numbering e.g "1. "
+                clean_question = re.sub(r'^\d+\.\s*', '', question)
                 st.button(
                     clean_question,
                     key=f"followup_{i}_{st.session_state.followup_key}",
@@ -311,40 +334,4 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
                 )
     except Exception as e:
         print(f"Error in followup section: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        st.session_state.followup_questions = []
