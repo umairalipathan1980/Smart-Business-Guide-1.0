@@ -1,4 +1,34 @@
 
+from typing_extensions import TypedDict
+from tavily import TavilyClient
+from sentence_transformers import SentenceTransformer, util
+from PyPDF2 import PdfReader
+from pydantic import BaseModel, Field
+from langgraph.graph import END, StateGraph
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_groq.chat_models import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.document_loaders import (UnstructuredMarkdownLoader,
+                                                  WebBaseLoader)
+from langchain_chroma import Chroma
+from langchain.retrievers.document_compressors import FlashrankRerank
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.chains import RetrievalQA
+from langchain import hub
+from bs4 import BeautifulSoup
+import spacy
+import requests
+from typing import List
+import warnings
+import sys
+import re
+import logging
 import os
 
 import streamlit as st
@@ -6,46 +36,14 @@ import streamlit as st
 # Set up environment variables
 # os.environ["LANGCHAIN_TRACING_V2"] = "true"
 # os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["USER_AGENT"] = "AgenticRAG/1.0" 
-os.environ["TAVILY_API_KEY"]=st.secrets["TAVILY_API_KEY"]
-os.environ["GROQ_API_KEY"]=st.secrets["GROQ_API_KEY"]
+os.environ["USER_AGENT"] = "AgenticRAG/1.0"
+os.environ["TAVILY_API_KEY"] = st.secrets["TAVILY_API_KEY"]
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 # os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 
-import logging
-import re
-import sys
-import warnings
-from typing import List
-
-import requests
-import spacy
-from bs4 import BeautifulSoup
-from langchain import hub
-from langchain.chains import RetrievalQA
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import FlashrankRerank
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import (UnstructuredMarkdownLoader,
-                                                  WebBaseLoader)
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_groq.chat_models import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.graph import END, StateGraph
-from pydantic import BaseModel, Field
-from PyPDF2 import PdfReader
-from sentence_transformers import SentenceTransformer, util
-from tavily import TavilyClient
-from typing_extensions import TypedDict
-
-########################Resolve or suppress warnings
+# Resolve or suppress warnings
 # Set global logging level to ERROR
 logging.basicConfig(level=logging.ERROR, force=True)
 # Suppress all SageMaker logs
@@ -54,7 +52,7 @@ logging.getLogger("sagemaker.config").setLevel(logging.CRITICAL)
 
 # Ignore the specific FutureWarning from Hugging Face Transformers
 warnings.filterwarnings(
-    "ignore", 
+    "ignore",
     message="`clean_up_tokenization_spaces` was not set.*",
     category=FutureWarning
 )
@@ -72,6 +70,7 @@ persist_directory_huggingface = 'data/chroma_db_llamaparse-huggincface'
 collection_name = 'rag'
 CHUNK_SIZE = 3000
 CHUNK_OVERLAP = 200
+
 
 def remove_tags(soup):
     # Remove unwanted tags
@@ -91,7 +90,9 @@ def remove_tags(soup):
             content += '- ' + text + '\n'
     return content
 
-#@st.cache_data
+# @st.cache_data
+
+
 def get_info(URLs):
     """
     Fetch and return contact information from predefined URLs.
@@ -102,17 +103,21 @@ def get_info(URLs):
             response = requests.get(url)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
-                combined_info += "URL: " + url + ": " + remove_tags(soup) + "\n\n" 
+                combined_info += "URL: " + url + \
+                    ": " + remove_tags(soup) + "\n\n"
             else:
                 combined_info += f"Failed to retrieve information from {url}\n\n"
         except Exception as e:
             combined_info += f"Error fetching URL {url}: {e}\n\n"
     return combined_info
 
-#@st.cache_data
+# @st.cache_data
+
+
 def staticChunker(folder_path):
     docs = []
-    print(f"Creating chunks. CHUNK_SIZE: {CHUNK_SIZE}, CHUNK_OVERLAP: {CHUNK_OVERLAP}")
+    print(
+        f"Creating chunks. CHUNK_SIZE: {CHUNK_SIZE}, CHUNK_OVERLAP: {CHUNK_OVERLAP}")
 
     # Loop through all .md files in the folder
     for file_name in os.listdir(folder_path):
@@ -129,12 +134,15 @@ def staticChunker(folder_path):
                 doc.metadata["source_file"] = file_name
 
             # Split loaded documents into chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
             chunked_docs = text_splitter.split_documents(documents)
             docs.extend(chunked_docs)
     return docs
 
-#@st.cache_resource
+# @st.cache_resource
+
+
 def load_or_create_vs(persist_directory):
     # Check if the vector store directory exists
     if os.path.exists(persist_directory):
@@ -160,6 +168,7 @@ def load_or_create_vs(persist_directory):
 
     return vectorstore
 
+
 def initialize_app(model_name, selected_embedding_model, selected_routing_model, selected_grading_model, hybrid_search, internet_search, answer_style):
     """
     Initialize embeddings, vectorstore, retriever, and LLM for the RAG workflow.
@@ -184,16 +193,20 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
 
     # Reinitialize components only if settings have changed
     if state_changed:
-        st.session_state.embed_model = initialize_embedding_model(selected_embedding_model)
-        
+        st.session_state.embed_model = initialize_embedding_model(
+            selected_embedding_model)
+
         # Update vectorstore
         persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
         st.session_state.vectorstore = load_or_create_vs(persist_directory)
-        st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
-        
+        st.session_state.retriever = st.session_state.vectorstore.as_retriever(
+            search_kwargs={"k": 5})
+
         st.session_state.llm = initialize_llm(model_name, answer_style)
-        st.session_state.router_llm = initialize_router_llm(selected_routing_model)
-        st.session_state.grader_llm = initialize_grading_llm(selected_grading_model)
+        st.session_state.router_llm = initialize_router_llm(
+            selected_routing_model)
+        st.session_state.grader_llm = initialize_grading_llm(
+            selected_grading_model)
         st.session_state.doc_grader = initialize_grader_chain()
 
         # Save updated state
@@ -208,7 +221,9 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
 
     return workflow.compile()
 
-#@st.cache_resource
+# @st.cache_resource
+
+
 def initialize_llm(model_name, answer_style):
     if "llm" not in st.session_state or st.session_state.llm.model_name != model_name:
         if answer_style == "Concise":
@@ -219,9 +234,19 @@ def initialize_llm(model_name, answer_style):
             temperature = 0.0
 
         if "gpt-" in model_name:
-            st.session_state.llm = ChatOpenAI(model=model_name, temperature=temperature, streaming=True)
+            st.session_state.llm = ChatOpenAI(
+                model=model_name, temperature=temperature, streaming=True)
+        elif "deepseek-" in model_name:
+            # Deepseek models need "hidden" reasoning_format to prevent <think> tags that otherwise cause issues
+            st.session_state.llm = ChatGroq(
+                model=model_name,
+                temperature=temperature,
+                streaming=True,
+                model_kwargs={"reasoning_format": "hidden"}
+            )
         else:
-            st.session_state.llm = ChatGroq(model=model_name, temperature=temperature, streaming=True)
+            st.session_state.llm = ChatGroq(
+                model=model_name, temperature=temperature, streaming=True)
 
     return st.session_state.llm
 
@@ -242,46 +267,71 @@ def initialize_embedding_model(selected_embedding_model):
     # Initialize a new model if it doesn't match the selected one
     if current_model_name != selected_embedding_model:
         if "text-" in selected_embedding_model:
-            st.session_state.embed_model = OpenAIEmbeddings(model=selected_embedding_model)
+            st.session_state.embed_model = OpenAIEmbeddings(
+                model=selected_embedding_model)
         else:
-            st.session_state.embed_model = HuggingFaceEmbeddings(model_name=selected_embedding_model)
+            st.session_state.embed_model = HuggingFaceEmbeddings(
+                model_name=selected_embedding_model)
 
     return st.session_state.embed_model
 
-#@st.cache_resource
+# @st.cache_resource
+
+
 def initialize_router_llm(selected_routing_model):
     if "router_llm" not in st.session_state or st.session_state.router_llm.model_name != selected_routing_model:
         if "gpt-" in selected_routing_model:
-            st.session_state.router_llm = ChatOpenAI(model=selected_routing_model, temperature=0.0)
+            st.session_state.router_llm = ChatOpenAI(
+                model=selected_routing_model, temperature=0.0)
+        elif "deepseek-" in selected_routing_model:
+            # DeepSeek models need "hidden" reasoning_format to prevent <think> tags
+            st.session_state.router_llm = ChatGroq(
+                model=selected_routing_model,
+                temperature=0.0,
+                model_kwargs={"reasoning_format": "hidden"}
+            )
         else:
-            st.session_state.router_llm = ChatGroq(model=selected_routing_model, temperature=0.0)
-    
+            st.session_state.router_llm = ChatGroq(
+                model=selected_routing_model, temperature=0.0)
+
     return st.session_state.router_llm
 
-#@st.cache_resource
+# @st.cache_resource
+
+
 def initialize_grading_llm(selected_grading_model):
     if "grader_llm" not in st.session_state or st.session_state.grader_llm.model_name != selected_grading_model:
         if "gpt-" in selected_grading_model:
-            st.session_state.grader_llm = ChatOpenAI(model=selected_grading_model, temperature=0.0, max_tokens = 16000)
+            st.session_state.grader_llm = ChatOpenAI(
+                model=selected_grading_model, temperature=0.0, max_tokens=16000)
+        elif "deepseek-" in selected_grading_model:
+            # Deepseek-models need "hidden" reasoning_format to prevent <think> tags from leaking
+            st.session_state.grader_llm = ChatGroq(
+                model=selected_grading_model,
+                temperature=0.0,
+                model_kwargs={"reasoning_format": "hidden"}
+            )
         else:
-            st.session_state.grader_llm = ChatGroq(model=selected_grading_model, temperature=0.0)
-    
+            st.session_state.grader_llm = ChatGroq(
+                model=selected_grading_model, temperature=0.0)
+
     return st.session_state.grader_llm
+
 
 model_list = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
-    "llama3-70b-8192",   
-    "llama3-8b-8192", 
-    "mixtral-8x7b-32768", 
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "mixtral-8x7b-32768",
     "gemma2-9b-it",
     "gpt-4o-mini",
     "gpt-4o",
     "deepseek-r1-distill-llama-70b"
-    ]
+]
 
 rag_prompt = PromptTemplate(
-    template = r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    template=r"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
                 You are a helpful, highly accurate and trustworthy assistant specialized in answering questions related to business, entrepreneurship, and the realted matters in Finland. 
                 Your responses must strictly adhere to the provided context, answer style, and question's language using the follow rules:
 
@@ -337,9 +387,10 @@ rag_prompt = PromptTemplate(
                 Context: {context} 
                 Answer style: {answer_style}
                 Answer: <|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-                input_variables=["question", "context", "answer_style"]
+    input_variables=["question", "context", "answer_style"]
 
 )
+
 
 def initialize_grader_chain():
     # Data model for LLM output format
@@ -350,7 +401,8 @@ def initialize_grader_chain():
         )
 
     # LLM for grading
-    structured_llm_grader = st.session_state.grader_llm.with_structured_output(GradeDocuments)
+    structured_llm_grader = st.session_state.grader_llm.with_structured_output(
+        GradeDocuments)
 
     # Prompt template for grading
     SYS_PROMPT = """You are an expert grader assessing relevance of a retrieved document to a user question.
@@ -371,6 +423,7 @@ def initialize_grader_chain():
     # Build grader chain
     return grade_prompt | structured_llm_grader
 
+
 def grade_documents(state):
     question = state["question"]
     documents = state.get("documents", [])
@@ -380,12 +433,14 @@ def grade_documents(state):
         print("No documents retrieved for grading.")
         return {"documents": [], "question": question, "web_search_needed": "Yes"}
 
-    print(f"Grading retrieved documents with {st.session_state.grader_llm.model_name}")
+    print(
+        f"Grading retrieved documents with {st.session_state.grader_llm.model_name}")
 
     for count, doc in enumerate(documents):
         try:
             # Evaluate document relevance
-            score = st.session_state.doc_grader.invoke({"documents": [doc], "question": question})
+            score = st.session_state.doc_grader.invoke(
+                {"documents": [doc], "question": question})
             print(f"Chunk {count} relevance: {score}")
             if score.binary_score == "Yes":
                 filtered_docs.append(doc)
@@ -405,6 +460,8 @@ def route_after_grading(state):
         return "generate"
 
 # Define graph state class
+
+
 class GraphState(TypedDict):
     question: str
     generation: str
@@ -412,15 +469,18 @@ class GraphState(TypedDict):
     documents: List[Document]
     answer_style: str
 
+
 def retrieve(state):
     print("Retrieving documents")
     question = state["question"]
     documents = st.session_state.retriever.invoke(question)
     return {"documents": documents, "question": question}
 
+
 def format_documents(documents):
     """Format documents into a single string for context."""
     return "\n\n".join(doc.page_content for doc in documents)
+
 
 def generate(state):
     question = state["question"]
@@ -428,7 +488,8 @@ def generate(state):
     answer_style = state.get("answer_style", "Concise")
 
     if "llm" not in st.session_state:
-        st.session_state.llm = initialize_llm(st.session_state.selected_model, answer_style)
+        st.session_state.llm = initialize_llm(
+            st.session_state.selected_model, answer_style)
 
     rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
@@ -446,17 +507,19 @@ def generate(state):
             st.session_state.llm = initialize_llm(current_model, answer_style)
             rag_chain = rag_prompt | st.session_state.llm | StrOutputParser()
 
-            #context = format_documents(documents)
+            # context = format_documents(documents)
             context = documents
-            generation = rag_chain.invoke({"context": context, "question": question, "answer_style": answer_style})
+            generation = rag_chain.invoke(
+                {"context": context, "question": question, "answer_style": answer_style})
 
             print(f"Generating a {answer_style} length response.")
-            #print(f"Response generated with {st.session_state.llm.model_name} model.")
+            # print(f"Response generated with {st.session_state.llm.model_name} model.")
             print("Done.")
 
             if current_model != original_model:
                 print(f"Reverting to original model: {original_model}")
-                st.session_state.llm = initialize_llm(original_model, answer_style)
+                st.session_state.llm = initialize_llm(
+                    original_model, answer_style)
 
             return {"documents": documents, "question": question, "generation": generation}
 
@@ -464,7 +527,8 @@ def generate(state):
             error_message = str(e)
             if "rate_limit_exceeded" in error_message or "Request too large" in error_message or "Please reduce the length of the messages or completion" in error_message:
                 print(f"Model's rate limit exceeded or request too large.")
-                current_model = model_list[(model_list.index(current_model) + 1) % len(model_list)]
+                current_model = model_list[(model_list.index(
+                    current_model) + 1) % len(model_list)]
                 print(f"Switching to model: {current_model}")
             else:
                 return {
@@ -479,24 +543,28 @@ def generate(state):
         "question": question,
     }
 
+
 def handle_unrelated(state):
     question = state["question"]
-    documents = state.get("documents",[])
+    documents = state.get("documents", [])
     response = "I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland. Could you please rephrase your question to focus on these topics?"
     documents.append(Document(page_content=response))
     return {"generation": response, "documents": documents, "question": question}
+
 
 def hybrid_search(state):
     question = state["question"]
     print("Invoking retriever...")
     vector_docs = st.session_state.retriever.invoke(question)
     web_docs = web_search({"question": question})["documents"]
-    
+
     # Add headings to distinguish between vector and web search results
-    vector_results = [Document(page_content="Smart guide results:" + doc.page_content) for doc in vector_docs]
+    vector_results = [Document(
+        page_content="Smart guide results:" + doc.page_content) for doc in vector_docs]
 
     # Check if any web_docs already contain "Internet search results:"
-    web_results_contain_header = any("Internet search results:" in doc.page_content for doc in web_docs)
+    web_results_contain_header = any(
+        "Internet search results:" in doc.page_content for doc in web_docs)
 
     # Add "Internet search results:" only if not already present in any web doc
     if not web_results_contain_header:
@@ -506,9 +574,9 @@ def hybrid_search(state):
     else:
         web_results = web_docs  # Keep web_docs unchanged if they already contain the header
 
-    
     combined_docs = vector_results + web_results
     return {"documents": combined_docs, "question": question}
+
 
 def web_search(state):
     if "tavily_client" not in st.session_state:
@@ -521,10 +589,11 @@ def web_search(state):
         print("Invoking internet search...")
         search_result = st.session_state.tavily_client.get_search_context(
             query=question,
-            search_depth="basic", #can be switched to 'advanced' mode that requires 2 credits per search.
+            # can be switched to 'advanced' mode that requires 2 credits per search.
+            search_depth="basic",
             max_tokens=4000,
-            max_results = 10,
-            include_domains = [
+            max_results=10,
+            include_domains=[
                 "migri.fi",
                 "enterfinland.fi",
                 "businessfinland.fi",
@@ -541,13 +610,14 @@ def web_search(state):
                 "yritystulkki.fi",
                 "tem.fi",
                 "prh.fi"
-                ],
+            ],
         )
         # Handle different types of results
         if isinstance(search_result, str):
             web_results = search_result
         elif isinstance(search_result, dict) and "documents" in search_result:
-            web_results = "Internet search results:".join([doc.get("content", "") for doc in search_result["documents"]])
+            web_results = "Internet search results:".join(
+                [doc.get("content", "") for doc in search_result["documents"]])
         else:
             web_results = "No valid results returned by TavilyClient."
         web_results_doc = Document(page_content=web_results)
@@ -564,27 +634,26 @@ def route_question(state):
     question = state["question"]
     hybrid_search_enabled = state.get("hybrid_search", False)
     internet_search_enabled = state.get("internet_search", False)
-    
+
     if hybrid_search_enabled:
         return "hybrid_search"
-    
+
     if internet_search_enabled:
         return "websearch"
 
     tool_selection = {
-    "websearch": (
-        "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
-    ),
-    "retrieve": (
-        "Questions broadly related to business, business planning, business opportunities, startups, entrepreneurship, employment, unemployment, pensions, insurance, social benefits, and similar topics"
-        "This includes questions about specific business opportunities (e.g., for specific expertise, area, topic) or suggestions. "
-    ),
-    "unrelated": (
-        "Questions not related to business, entrepreneurship, startups, employment, unemployment, pensions, insurance, social benefits, or similar topics, "
-        "or those related to other countries or cities instead of Finland."
-    )
-}
-
+        "websearch": (
+            "Questions requiring current statistics or real-time information such as tax rate, taxation rules, taxable incomes, tax exemptions, the tax filing process, immigration or visa process or questions related to Finnish immigration authority (Migri), company registration, licensing, permits, and notifications required for starting a business, especially for foreign entrepreneurs, etc. "
+        ),
+        "retrieve": (
+            "Questions broadly related to business, business planning, business opportunities, startups, entrepreneurship, employment, unemployment, pensions, insurance, social benefits, and similar topics"
+            "This includes questions about specific business opportunities (e.g., for specific expertise, area, topic) or suggestions. "
+        ),
+        "unrelated": (
+            "Questions not related to business, entrepreneurship, startups, employment, unemployment, pensions, insurance, social benefits, or similar topics, "
+            "or those related to other countries or cities instead of Finland."
+        )
+    }
 
     SYS_PROMPT = """Act as a router to select specific tools or functions based on user's question. 
                  - Analyze the given question and use the given tool selection dictionary to output the name of the relevant tool based on its description and relevancy with the question. 
@@ -613,15 +682,18 @@ def route_question(state):
     }
 
     # Invoke the chain
-    tool = (prompt | st.session_state.router_llm | StrOutputParser()).invoke(inputs)
-    tool = re.sub(r"[\\'\"`]", "", tool.strip()) # Remove backslashes and extra spaces
+    tool = (prompt | st.session_state.router_llm |
+            StrOutputParser()).invoke(inputs)
+    # Remove backslashes and extra spaces
+    tool = re.sub(r"[\\'\"`]", "", tool.strip())
     if not "unrelated" in tool:
-        print(f"Invoking {tool} tool through {st.session_state.router_llm.model_name}")
+        print(
+            f"Invoking {tool} tool through {st.session_state.router_llm.model_name}")
     if "websearch" in tool:
         print("I need to get recent information from this query.")
     return tool
 
-    
+
 workflow = StateGraph(GraphState)
 
 # Add nodes

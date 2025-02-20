@@ -37,7 +37,7 @@ from st_callback import get_streamlit_cb
 torch.classes.__path__ = []
 
 # TODO: App crashes when selecting "llama-3.1-8b-instant" model.
-st.set_option("client.showErrorDetails", False) # Hide error details
+st.set_option("client.showErrorDetails", False)  # Hide error details
 
 # -------------------- Initialization --------------------
 if "messages" not in st.session_state:
@@ -58,16 +58,21 @@ def get_followup_questions(last_user, last_assistant):
     """
     Generate three concise follow-up questions dynamically based on the latest conversation.
     """
-    if "llm" not in st.session_state:
-        return []  # guard against uninitialized session state
+    prompt = f"""Based on the conversation below:
+User: {last_user}
+Assistant: {last_assistant}
+Generate three concise follow-up questions that a user might ask next.
+Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
+Follow-up Questions:"""
     try:
-        prompt = f"""Based on the conversation below:
-            User: {last_user}
-            Assistant: {last_assistant}
-            Generate three concise follow-up questions that a user might ask next.
-            Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
-            Follow-up Questions:"""
-        response = st.session_state.llm.invoke(prompt)
+        # Use ChatOpenAI as a fallback if the selected models because otherwise it will fail. e.g Gemma might not support invoking method.
+        if any(model_type in st.session_state.selected_model.lower() 
+               for model_type in ["gemma2", "deepseek"]):
+            fallback_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
+            response = fallback_llm.invoke(prompt)
+        else:
+            response = st.session_state.llm.invoke(prompt)
+
         text = response.content if hasattr(
             response, "content") else str(response)
         questions = [q.strip() for q in text.split('\n') if q.strip()]
@@ -102,7 +107,10 @@ def process_question(question, answer_style):
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         debug_placeholder = st.empty()
-        st_callback = get_streamlit_cb(st.empty()) # CallBack handler get_streamlit_cb
+        # CallBack handler get_streamlit_cb
+        st_callback = get_streamlit_cb(st.empty())
+
+        start_time = time.time()
 
         with st.spinner("Thinking..."):
             inputs = {
@@ -171,12 +179,23 @@ def process_question(question, answer_style):
                             response_placeholder.error(error_msg)
                             assistant_response = error_msg
 
+        # End timer and calculate generation time
+        end_time = time.time()
+        generation_time = end_time - start_time
+        st.session_state["last_generation_time"] = generation_time
+
+        # Optionally display the generation time if the timer is toggled on
+        if st.session_state.get("show_timer", True):
+            response_placeholder.markdown(
+                f"*Generation time: {generation_time:.2f} seconds*")
+
         # Restore original stdout
         sys.stdout = sys.__stdout__
 
     # 3) Update the assistant message with the final response
     st.session_state.messages[assistant_index]["content"] = assistant_response
     st.session_state.followup_key += 1
+
 
 # -------------------- Page Layout & Configuration --------------------
 st.set_page_config(
@@ -278,11 +297,9 @@ with st.sidebar:
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
 
-    # Initialize your RAG workflow here.
-    previous_model = st.session_state.selected_model
-    previous_embedding_model = st.session_state.selected_embedding_model
-    previous_routing_model = st.session_state.selected_routing_model
-
+    # Toggle for displaying generation time
+    st.checkbox("Show generation time", value=True, key="show_timer")
+    # RAG workflow initilizate.
 try:
     app = initialize_app(
         st.session_state.selected_model,
@@ -295,11 +312,6 @@ try:
     )
 except Exception as e:
     st.error("Error initializing model, continuing with previous model: " + str(e))
-    # Return to the previous models if initialization fails
-    st.session_state.selected_model = previous_model
-    st.session_state.selected_embedding_model = previous_embedding_model
-    st.session_state.selected_routing_model = previous_routing_model
-
     # (Optional) Initialize your primary LLM if needed.
     # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
 
@@ -341,6 +353,11 @@ for message in st.session_state.messages:
                 unsafe_allow_html=True
             )
 
+# Display the last generation time outside the chat messages if enabled.
+if st.session_state.get("show_timer", True) and "last_generation_time" in st.session_state:
+    st.markdown(
+        f"<small>Last Generation Time: {st.session_state.last_generation_time:.2f} seconds</small>", unsafe_allow_html=True)
+
 # -------------------- Process a Pending Follow-Up (if any) --------------------
 if st.session_state.pending_followup is not None:
     question = st.session_state.pending_followup
@@ -369,7 +386,7 @@ def handle_followup(question: str):
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     try:
         last_assistant_message = st.session_state.messages[-1]["content"]
-        
+
         # Don't generate followup questions if response is empty or contains error messages
         if not last_assistant_message.strip() or "Sorry, I encountered an error" in last_assistant_message:
             st.session_state.followup_questions = []
@@ -383,7 +400,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
                  if msg["role"] == "user"),
                 ""
             )
-            
+
             # Generate new questions only if the last assistant message has changed
             if st.session_state.last_assistant != last_assistant_message:
                 print("Generating new followup questions")
