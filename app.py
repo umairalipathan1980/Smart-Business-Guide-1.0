@@ -8,20 +8,17 @@ import sys
 
 import streamlit as st
 import torch
+import tornado
 from langchain_openai import ChatOpenAI
 
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
 
-# Fix for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+# Fix below for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
 torch.classes.__path__ = []
-# TODO: Bug fix App crashes when selecting "llama-3.1-8b-instant" model.
 
-hardcoded_questions = [
-    "Miten rekisteröin toiminimen Suomessa?",
-    "Mitä eri yritysmuotoja on olemassa?",
-    "Miten hankin alkupääoman yritykselle?"
-]
+# TODO: App crashes when selecting "llama-3.1-8b-instant" model.
+st.set_option("client.showErrorDetails", False) # Hide error details
 
 # -------------------- Initialization --------------------
 if "messages" not in st.session_state:
@@ -58,7 +55,15 @@ def get_followup_questions(last_user, last_assistant):
         print(f"Failed to generate follow-up questions: {e}")
         return []
 
+
 def process_question(question, answer_style):
+    """
+    Process a question (typed or follow-up):
+      1. Append as a user message.
+      2. Run the RAG workflow (via app.stream) and stream the assistant's response.
+         If streaming produces no content (or errors occur), a fallback non-streaming
+         approach is attempted.
+    """
     # 1) Add user question to the chat
     st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
@@ -69,29 +74,29 @@ def process_question(question, answer_style):
     sys.stdout = output_buffer
     assistant_response = ""
 
-    # 2) Initialize empty assistant message where the response will be streamed
+    # 2) Initialize empty assistant message for streaming the response
     st.session_state.messages.append({"role": "assistant", "content": ""})
     assistant_index = len(st.session_state.messages) - 1
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         debug_placeholder = st.empty()
-        st_callback = get_streamlit_cb(st.empty())
+        st_callback = get_streamlit_cb(st.empty()) # CallBack handler get_streamlit_cb
 
         with st.spinner("Thinking..."):
+            inputs = {
+                "question": question,
+                "hybrid_search": st.session_state.hybrid_search,
+                "internet_search": st.session_state.internet_search,
+                "answer_style": answer_style
+            }
             try:
-                inputs = {
-                    "question": question,
-                    "hybrid_search": st.session_state.hybrid_search,
-                    "internet_search": st.session_state.internet_search,
-                    "answer_style": answer_style
-                }
-
-                # Process the question
+                # Attempt to stream response
                 for idx, chunk in enumerate(app.stream(inputs, config={"callbacks": [st_callback]})):
                     debug_logs = output_buffer.getvalue()
                     debug_placeholder.text_area(
-                        "Debug Logs", debug_logs, height=100, key=f"debug_logs_{idx}")
+                        "Debug Logs", debug_logs, height=100, key=f"debug_logs_{idx}"
+                    )
                     if "generate" in chunk and "generation" in chunk["generate"]:
                         assistant_response += chunk["generate"]["generation"]
                         styled_response = re.sub(
@@ -103,18 +108,54 @@ def process_question(question, answer_style):
                             f"**Assistant:** {styled_response}",
                             unsafe_allow_html=True
                         )
-
+            except (tornado.websocket.WebSocketClosedError, tornado.iostream.StreamClosedError) as ws_error:
+                # Log and silently handle known WebSocket errors without showing a modal.
+                print(f"WebSocket connection closed: {ws_error}")
             except Exception as e:
-                error_msg = f"Error generating response: {str(e)}"
-                response_placeholder.error(error_msg)
-                st_callback.text = error_msg
+                error_str = str(e)
+                # Filter out non-critical errors (like "Bad message format") from showing in the UI.
+                if "Bad message format" in error_str:
+                    print(f"Non-critical error: {error_str}")
+                else:
+                    error_msg = f"Error generating response: {error_str}"
+                    response_placeholder.error(error_msg)
+                    st_callback.text = error_msg
 
+            # If no response was produced by streaming, attempt fallback using invoke
+            if not assistant_response.strip():
+                try:
+                    result = app.invoke(inputs)
+                    if "generate" in result and "generation" in result["generate"]:
+                        assistant_response = result["generate"]["generation"]
+                        styled_response = re.sub(
+                            r'\[(.*?)\]',
+                            r'<span class="reference">[\1]</span>',
+                            assistant_response
+                        )
+                        response_placeholder.markdown(
+                            f"**Assistant:** {styled_response}",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        raise ValueError("No generation found in result")
+                except Exception as fallback_error:
+                    fallback_str = str(fallback_error)
+                    if "Bad message format" in fallback_str:
+                        print(f"Non-critical fallback error: {fallback_str}")
+                    else:
+                        print(f"Fallback also failed: {fallback_str}")
+                        if not assistant_response.strip():
+                            error_msg = ("Sorry, I encountered an error while generating a response. "
+                                         "Please try again or select a different model.")
+                            response_placeholder.error(error_msg)
+                            assistant_response = error_msg
+
+        # Restore original stdout
         sys.stdout = sys.__stdout__
 
     # 3) Update the assistant message with the final response
     st.session_state.messages[assistant_index]["content"] = assistant_response
     st.session_state.followup_key += 1
-
 
 # -------------------- Page Layout & Configuration --------------------
 st.set_page_config(
@@ -217,6 +258,7 @@ with st.sidebar:
         st.session_state.messages = []
 
     # Initialize your RAG workflow here.
+try:
     app = initialize_app(
         st.session_state.selected_model,
         st.session_state.selected_embedding_model,
@@ -226,7 +268,8 @@ with st.sidebar:
         st.session_state.internet_search,
         st.session_state.answer_style
     )
-
+except Exception as e:
+   st.error("Error initializing model, continuing with previous model: " + str(e))
     # (Optional) Initialize your primary LLM if needed.
     # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
 
@@ -296,17 +339,22 @@ def handle_followup(question: str):
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     try:
         last_assistant_message = st.session_state.messages[-1]["content"]
-        last_user_message = next(
-            (msg["content"] for msg in reversed(st.session_state.messages)
-             if msg["role"] == "user"),
-            ""
-        )
-
-        # If the last assistant message is the "unrelated" response, do not generate follow-up questions
-        if "I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland." in last_assistant_message:
+        
+        # Don't generate followup questions if response is empty or contains error messages
+        if not last_assistant_message.strip() or "Sorry, I encountered an error" in last_assistant_message:
+            st.session_state.followup_questions = []
+        # Don't generate followup questions for unrelated responses
+        elif "I apologize, but I'm designed to answer questions" in last_assistant_message:
             st.session_state.followup_questions = []
         else:
-            # Generate new questions if the last assistant message has changed
+            # Get the last user message
+            last_user_message = next(
+                (msg["content"] for msg in reversed(st.session_state.messages)
+                 if msg["role"] == "user"),
+                ""
+            )
+            
+            # Generate new questions only if the last assistant message has changed
             if st.session_state.last_assistant != last_assistant_message:
                 print("Generating new followup questions")
                 st.session_state.last_assistant = last_assistant_message
@@ -317,14 +365,13 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
                     )
                 except Exception as e:
                     print(f"Failed to generate followup questions: {e}")
-                    # Reset followup questions on error
                     st.session_state.followup_questions = []
 
-        # Display follow-up question buttons only if list is not empty
+        # Display follow-up questions only if we have valid ones
         if st.session_state.followup_questions and len(st.session_state.followup_questions) > 0:
             st.markdown("#### Related:")
             for i, question in enumerate(st.session_state.followup_questions):
-                # Remove numbering e.g "1. "
+                # Remove numbering e.g "1. ", "2. ", etc.
                 clean_question = re.sub(r'^\d+\.\s*', '', question)
                 st.button(
                     clean_question,

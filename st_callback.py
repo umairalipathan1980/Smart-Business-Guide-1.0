@@ -24,7 +24,7 @@ def get_streamlit_cb(parent_container: DeltaGenerator) -> BaseCallbackHandler:
             self.text = initial_text
             self.reference_pattern = r'\[(.*?)\]'
             self.is_streaming = False
-            
+
         # args and kwargs are not used in the following methods, but can be used to pass additional information
         def on_llm_start(self, *args, **kwargs) -> None:
             """Called when the LLM starts generating tokens."""
@@ -40,10 +40,14 @@ def get_streamlit_cb(parent_container: DeltaGenerator) -> BaseCallbackHandler:
                 r'<span class="reference">[\1]</span>',
                 self.text
             )
-            self.token_placeholder.markdown(
-                f"**Assistant:** {styled_text}",
-                unsafe_allow_html=True
-            )
+            try:
+                self.token_placeholder.markdown(
+                    f"**Assistant:** {styled_text}",
+                    unsafe_allow_html=True
+                )
+            except Exception:
+                # If the WebSocket is closed or any error occurs, stop streaming.
+                self.is_streaming = False
 
         def on_llm_end(self, *args, **kwargs) -> None:
             """Called when the LLM finishes generating tokens."""

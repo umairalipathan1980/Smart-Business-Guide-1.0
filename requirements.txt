@@ -15,5 +15,5 @@ flashrank
 beautifulsoup4
 langchain-openai
 pydantic
-streamlit
+streamlit>=1.40
 chromadb
