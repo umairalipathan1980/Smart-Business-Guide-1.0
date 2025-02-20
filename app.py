@@ -1,15 +1,34 @@
-# __import__('pysqlite3')
-# import sys
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
 import io
 import re  # ensure regex is imported
 import sys
+import time  # for minimal delay
 
 import streamlit as st
 import torch
 import tornado
 from langchain_openai import ChatOpenAI
+
+# Early session state initialization
+default_keys = {
+    "messages": [],
+    "followup_key": 0,
+    "pending_followup": None,
+    "last_assistant": None,
+    "followup_questions": [],
+    "selected_model": "gpt-4o",
+    "selected_routing_model": "gpt-4o",
+    "selected_grading_model": "gpt-4o",
+    "selected_embedding_model": "text-embedding-3-large",
+    "hybrid_search": False,
+    "internet_search": False,
+    "answer_style": "Explanatory",
+    # Include any additional keys used later (e.g., llm, embed_model)
+}
+for key, default in default_keys.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+time.sleep(0.1)  # optional delay to ensure proper initialization
 
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
@@ -39,6 +58,8 @@ def get_followup_questions(last_user, last_assistant):
     """
     Generate three concise follow-up questions dynamically based on the latest conversation.
     """
+    if "llm" not in st.session_state:
+        return []  # guard against uninitialized session state
     try:
         prompt = f"""Based on the conversation below:
             User: {last_user}
@@ -258,6 +279,10 @@ with st.sidebar:
         st.session_state.messages = []
 
     # Initialize your RAG workflow here.
+    previous_model = st.session_state.selected_model
+    previous_embedding_model = st.session_state.selected_embedding_model
+    previous_routing_model = st.session_state.selected_routing_model
+
 try:
     app = initialize_app(
         st.session_state.selected_model,
@@ -269,7 +294,12 @@ try:
         st.session_state.answer_style
     )
 except Exception as e:
-   st.error("Error initializing model, continuing with previous model: " + str(e))
+    st.error("Error initializing model, continuing with previous model: " + str(e))
+    # Return to the previous models if initialization fails
+    st.session_state.selected_model = previous_model
+    st.session_state.selected_embedding_model = previous_embedding_model
+    st.session_state.selected_routing_model = previous_routing_model
+
     # (Optional) Initialize your primary LLM if needed.
     # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
 
