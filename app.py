@@ -11,27 +11,27 @@ from langchain_openai import ChatOpenAI
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
 
-# Early session state initialization
-default_keys = {
-    "messages": [],
-    "followup_key": 0,
-    "pending_followup": None,
-    "last_assistant": None,
-    "followup_questions": [],
-    "selected_model": "gpt-4o",
-    "selected_routing_model": "gpt-4o",
-    "selected_grading_model": "gpt-4o",
-    "selected_embedding_model": "text-embedding-3-large",
-    "hybrid_search": False,
-    "internet_search": False,
-    "answer_style": "Explanatory",
-    # Include any additional keys used later (e.g., llm, embed_model)
-}
-for key, default in default_keys.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
+# Early session state initialization alternative way to set default values.
+# default_keys = {
+#     "messages": [],
+#     "followup_key": 0,
+#     "pending_followup": None,
+#     "last_assistant": None,
+#     "followup_questions": [],
+#     "selected_model": "gpt-4o",
+#     "selected_routing_model": "gpt-4o",
+#     "selected_grading_model": "gpt-4o",
+#     "selected_embedding_model": "text-embedding-3-large",
+#     "hybrid_search": False,
+#     "internet_search": False,
+#     "answer_style": "Explanatory",
+#     # Include any additional keys used later (e.g., llm, embed_model)
+# }
+# for key, default in default_keys.items():
+#     if key not in st.session_state:
+#         st.session_state[key] = default
 
-time.sleep(0.1)  # optional delay to ensure proper initialization
+# time.sleep(0.1)  # optional delay to ensure proper initialization
 
 
 # Fix below for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
