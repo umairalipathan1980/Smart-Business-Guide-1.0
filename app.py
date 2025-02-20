@@ -67,7 +67,7 @@ Follow-up Questions:"""
     try:
         # Use ChatOpenAI as a fallback if the selected models because otherwise it will fail. e.g Gemma might not support invoking method.
         if any(model_type in st.session_state.selected_model.lower() 
-               for model_type in ["gemma2", "deepseek"]):
+               for model_type in ["gemma2", "deepseek", "mixtral"]):
             fallback_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
             response = fallback_llm.invoke(prompt)
         else:
@@ -372,14 +372,12 @@ if user_input:
             "Your question exceeds 200 characters. Please shorten it and try again.")
     else:
         process_question(user_input, st.session_state.answer_style)
-        st.rerun()
 
 # -------------------- Helper function for Follow-Up --------------------
 
 
 def handle_followup(question: str):
     st.session_state.pending_followup = question
-    st.rerun()
 
 
 # -------------------- Generate and Display Follow-Up Questions --------------------

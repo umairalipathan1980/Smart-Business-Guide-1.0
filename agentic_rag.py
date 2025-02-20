@@ -1,37 +1,37 @@
 
-from typing_extensions import TypedDict
-from tavily import TavilyClient
-from sentence_transformers import SentenceTransformer, util
-from PyPDF2 import PdfReader
-from pydantic import BaseModel, Field
-from langgraph.graph import END, StateGraph
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_groq.chat_models import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.documents import Document
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.document_loaders import (UnstructuredMarkdownLoader,
-                                                  WebBaseLoader)
-from langchain_chroma import Chroma
-from langchain.retrievers.document_compressors import FlashrankRerank
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.chains import RetrievalQA
-from langchain import hub
-from bs4 import BeautifulSoup
-import spacy
-import requests
-from typing import List
-import warnings
-import sys
-import re
 import logging
 import os
+import re
+import sys
+import warnings
+from typing import List
 
+import requests
+import spacy
 import streamlit as st
+from bs4 import BeautifulSoup
+from langchain import hub
+from langchain.chains import RetrievalQA
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import FlashrankRerank
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import (UnstructuredMarkdownLoader,
+                                                  WebBaseLoader)
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_groq.chat_models import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langgraph.graph import END, StateGraph
+from pydantic import BaseModel, Field
+from PyPDF2 import PdfReader
+from sentence_transformers import SentenceTransformer, util
+from tavily import TavilyClient
+from typing_extensions import TypedDict
 
 # Set up environment variables
 # os.environ["LANGCHAIN_TRACING_V2"] = "true"
@@ -193,34 +193,45 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
 
     # Reinitialize components only if settings have changed
     if state_changed:
-        st.session_state.embed_model = initialize_embedding_model(
-            selected_embedding_model)
+        try:
+            st.session_state.embed_model = initialize_embedding_model(selected_embedding_model)
+            
+            # Update vectorstore
+            persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
+            st.session_state.vectorstore = load_or_create_vs(persist_directory)
+            st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
+            
+            st.session_state.llm = initialize_llm(model_name, answer_style)
+            st.session_state.router_llm = initialize_router_llm(selected_routing_model)
+            st.session_state.grader_llm = initialize_grading_llm(selected_grading_model)
+            st.session_state.doc_grader = initialize_grader_chain()
 
-        # Update vectorstore
-        persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
-        st.session_state.vectorstore = load_or_create_vs(persist_directory)
-        st.session_state.retriever = st.session_state.vectorstore.as_retriever(
-            search_kwargs={"k": 5})
-
-        st.session_state.llm = initialize_llm(model_name, answer_style)
-        st.session_state.router_llm = initialize_router_llm(
-            selected_routing_model)
-        st.session_state.grader_llm = initialize_grading_llm(
-            selected_grading_model)
-        st.session_state.doc_grader = initialize_grader_chain()
-
-        # Save updated state
-        st.session_state.current_model_state.update({
-            "answering_model": model_name,
-            "embedding_model": selected_embedding_model,
-            "routing_model": selected_routing_model,
-            "grading_model": selected_grading_model,
-        })
+            # Save updated state
+            st.session_state.current_model_state.update({
+                "answering_model": model_name,
+                "embedding_model": selected_embedding_model,
+                "routing_model": selected_routing_model,
+                "grading_model": selected_grading_model,
+            })
+        except Exception as e:
+            st.error(f"Error during initialization: {e}")
+            # Restore previous state if available
+            if st.session_state.current_model_state["answering_model"]:
+                st.warning(f"Continuing with previous configuration")
+            else:
+                # Fallback to OpenAI if no previous state
+                st.session_state.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, streaming=True)
+                st.session_state.router_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+                st.session_state.grader_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 
     print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
 
-    return workflow.compile()
-
+    try:
+        return workflow.compile()
+    except Exception as e:
+        st.error(f"Error compiling workflow: {e}")
+        # Return a simple dummy workflow that just echoes the input
+        return lambda x: {"generation": "Error in workflow. Please try a different model.", "question": x.get("question", "")}
 # @st.cache_resource
 
 
