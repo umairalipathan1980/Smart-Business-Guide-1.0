@@ -3,8 +3,9 @@
 # sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import io
-import re  # ensure regex is imported
+import re
 import sys
+import time
 
 import streamlit as st
 import torch
@@ -83,6 +84,8 @@ def process_question(question, answer_style):
         debug_placeholder = st.empty()
         st_callback = get_streamlit_cb(st.empty()) # CallBack handler get_streamlit_cb
 
+        start_time = time.time()
+
         with st.spinner("Thinking..."):
             inputs = {
                 "question": question,
@@ -151,7 +154,16 @@ def process_question(question, answer_style):
                             response_placeholder.error(error_msg)
                             assistant_response = error_msg
 
-        # Restore original stdout
+        # End timer and calculate generation time
+        end_time = time.time()
+        generation_time = end_time - start_time
+        st.session_state["last_generation_time"] = generation_time
+
+        # Optionally display the generation time if the timer is toggled on
+        if st.session_state.get("show_timer", True):
+            response_placeholder.markdown(f"*Generation time: {generation_time:.2f} seconds*")
+
+        # Restore original stdout    
         sys.stdout = sys.__stdout__
 
     # 3) Update the assistant message with the final response
@@ -257,8 +269,10 @@ with st.sidebar:
 
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
-
-    # Initialize your RAG workflow here.
+    
+    # Toggle for displaying generation time
+    st.checkbox("Show generation time", value=True, key="show_timer")
+    # RAG workflow initilizate.
 try:
     app = initialize_app(
         st.session_state.selected_model,
@@ -311,6 +325,10 @@ for message in st.session_state.messages:
                 f"**Assistant:** {styled_response}",
                 unsafe_allow_html=True
             )
+
+# Display the last generation time outside the chat messages if enabled.
+if st.session_state.get("show_timer", True) and "last_generation_time" in st.session_state:
+    st.markdown(f"<small>Last Generation Time: {st.session_state.last_generation_time:.2f} seconds</small>", unsafe_allow_html=True)
 
 # -------------------- Process a Pending Follow-Up (if any) --------------------
 if st.session_state.pending_followup is not None:
