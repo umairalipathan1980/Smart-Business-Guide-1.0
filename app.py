@@ -8,6 +8,9 @@ import torch
 import tornado
 from langchain_openai import ChatOpenAI
 
+from agentic_rag import initialize_app
+from st_callback import get_streamlit_cb
+
 # Early session state initialization
 default_keys = {
     "messages": [],
@@ -30,13 +33,11 @@ for key, default in default_keys.items():
 
 time.sleep(0.1)  # optional delay to ensure proper initialization
 
-from agentic_rag import initialize_app
-from st_callback import get_streamlit_cb
 
 # Fix below for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
 torch.classes.__path__ = []
 
-# TODO: App crashes when selecting "llama-3.1-8b-instant" model.
+# TODO: App crashes when selecting "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
 st.set_option("client.showErrorDetails", False)  # Hide error details
 
 # -------------------- Initialization --------------------
@@ -66,7 +67,7 @@ Each question should be on a separate line. The generated questions should be in
 Follow-up Questions:"""
     try:
         # Use ChatOpenAI as a fallback if the selected models because otherwise it will fail. e.g Gemma might not support invoking method.
-        if any(model_type in st.session_state.selected_model.lower() 
+        if any(model_type in st.session_state.selected_model.lower()
                for model_type in ["gemma2", "deepseek", "mixtral"]):
             fallback_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
             response = fallback_llm.invoke(prompt)

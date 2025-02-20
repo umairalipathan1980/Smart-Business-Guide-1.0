@@ -194,16 +194,20 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
     # Reinitialize components only if settings have changed
     if state_changed:
         try:
-            st.session_state.embed_model = initialize_embedding_model(selected_embedding_model)
-            
+            st.session_state.embed_model = initialize_embedding_model(
+                selected_embedding_model)
+
             # Update vectorstore
             persist_directory = persist_directory_openai if "text-" in selected_embedding_model else persist_directory_huggingface
             st.session_state.vectorstore = load_or_create_vs(persist_directory)
-            st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
-            
+            st.session_state.retriever = st.session_state.vectorstore.as_retriever(
+                search_kwargs={"k": 5})
+
             st.session_state.llm = initialize_llm(model_name, answer_style)
-            st.session_state.router_llm = initialize_router_llm(selected_routing_model)
-            st.session_state.grader_llm = initialize_grading_llm(selected_grading_model)
+            st.session_state.router_llm = initialize_router_llm(
+                selected_routing_model)
+            st.session_state.grader_llm = initialize_grading_llm(
+                selected_grading_model)
             st.session_state.doc_grader = initialize_grader_chain()
 
             # Save updated state
@@ -220,9 +224,12 @@ def initialize_app(model_name, selected_embedding_model, selected_routing_model,
                 st.warning(f"Continuing with previous configuration")
             else:
                 # Fallback to OpenAI if no previous state
-                st.session_state.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, streaming=True)
-                st.session_state.router_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
-                st.session_state.grader_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+                st.session_state.llm = ChatOpenAI(
+                    model="gpt-4o-mini", temperature=0.0, streaming=True)
+                st.session_state.router_llm = ChatOpenAI(
+                    model="gpt-4o-mini", temperature=0.0)
+                st.session_state.grader_llm = ChatOpenAI(
+                    model="gpt-4o-mini", temperature=0.0)
 
     print(f"Using LLM: {model_name}, Router LLM: {selected_routing_model}, Grader LLM:{selected_grading_model}, embedding model: {selected_embedding_model}")
 
@@ -288,6 +295,8 @@ def initialize_embedding_model(selected_embedding_model):
 
 # @st.cache_resource
 
+# FIX: mixtral model won't work with ChatGroq idk why. Maybe add gpt-4o-mini as fallback
+
 
 def initialize_router_llm(selected_routing_model):
     if "router_llm" not in st.session_state or st.session_state.router_llm.model_name != selected_routing_model:
@@ -295,12 +304,14 @@ def initialize_router_llm(selected_routing_model):
             st.session_state.router_llm = ChatOpenAI(
                 model=selected_routing_model, temperature=0.0)
         elif "deepseek-" in selected_routing_model:
-            # DeepSeek models need "hidden" reasoning_format to prevent <think> tags
             st.session_state.router_llm = ChatGroq(
                 model=selected_routing_model,
                 temperature=0.0,
                 model_kwargs={"reasoning_format": "hidden"}
             )
+        # Uncomment this block to use gpt-4o-mini as a fallback for mixtral models. Because 20.2.2025 mixtral model won't in router_llm
+        # elif "mixtral" in selected_routing_model.lower():
+        #     st.session_state.router_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
         else:
             st.session_state.router_llm = ChatGroq(
                 model=selected_routing_model, temperature=0.0)

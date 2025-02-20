@@ -12,6 +12,7 @@ from streamlit.runtime.scriptrunner import (add_script_run_ctx,
 # Code that use as reference to create the callback handler for Streamlit
 # https://github.com/shiv248/Streamlit-x-LangGraph-Cookbooks/blob/master/simple_streaming/st_callable_util.py
 
+
 def get_streamlit_cb(parent_container: DeltaGenerator) -> BaseCallbackHandler:
     """
     Creates a Streamlit callback handler that updates the provided container
@@ -55,8 +56,10 @@ def get_streamlit_cb(parent_container: DeltaGenerator) -> BaseCallbackHandler:
 
     # Add Streamlit context management to ensure the callback runs in the proper context
     fn_return_type = TypeVar('fn_return_type')
+
     def add_streamlit_context(fn: Callable[..., fn_return_type]) -> Callable[..., fn_return_type]:
         ctx = get_script_run_ctx()
+
         def wrapper(*args, **kwargs) -> fn_return_type:
             add_script_run_ctx(ctx=ctx)
             return fn(*args, **kwargs)
