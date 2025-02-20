@@ -122,6 +122,7 @@ def process_question(question, answer_style):
                     st_callback.text = error_msg
 
             # If no response was produced by streaming, attempt fallback using invoke
+            # TODO: might need some tweaking, it never gets here but logic is correct
             if not assistant_response.strip():
                 try:
                     result = app.invoke(inputs)
