@@ -1,11 +1,7 @@
-# __import__('pysqlite3')
-# import sys
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
 import io
 import re
 import sys
-import time
+import time  # for minimal delay
 
 import streamlit as st
 import torch
@@ -15,11 +11,34 @@ from langchain_openai import ChatOpenAI
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
 
+# Early session state initialization
+default_keys = {
+    "messages": [],
+    "followup_key": 0,
+    "pending_followup": None,
+    "last_assistant": None,
+    "followup_questions": [],
+    "selected_model": "gpt-4o",
+    "selected_routing_model": "gpt-4o",
+    "selected_grading_model": "gpt-4o",
+    "selected_embedding_model": "text-embedding-3-large",
+    "hybrid_search": False,
+    "internet_search": False,
+    "answer_style": "Explanatory",
+    # Include any additional keys used later (e.g., llm, embed_model)
+}
+for key, default in default_keys.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+time.sleep(0.1)  # optional delay to ensure proper initialization
+
+
 # Fix below for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
 torch.classes.__path__ = []
 
-# TODO: App crashes when selecting "llama-3.1-8b-instant" model.
-st.set_option("client.showErrorDetails", False) # Hide error details
+# TODO: App crashes when selecting "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
+st.set_option("client.showErrorDetails", False)  # Hide error details
 
 # -------------------- Initialization --------------------
 if "messages" not in st.session_state:
@@ -40,14 +59,21 @@ def get_followup_questions(last_user, last_assistant):
     """
     Generate three concise follow-up questions dynamically based on the latest conversation.
     """
+    prompt = f"""Based on the conversation below:
+User: {last_user}
+Assistant: {last_assistant}
+Generate three concise follow-up questions that a user might ask next.
+Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
+Follow-up Questions:"""
     try:
-        prompt = f"""Based on the conversation below:
-            User: {last_user}
-            Assistant: {last_assistant}
-            Generate three concise follow-up questions that a user might ask next.
-            Each question should be on a separate line. The generated questions should be independent and can be answered without knowing the last question. Focus on brevity.
-            Follow-up Questions:"""
-        response = st.session_state.llm.invoke(prompt)
+        # Use ChatOpenAI as a fallback if the selected models because otherwise it will fail. e.g Gemma might not support invoking method.
+        if any(model_type in st.session_state.selected_model.lower()
+               for model_type in ["gemma2", "deepseek", "mixtral"]):
+            fallback_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
+            response = fallback_llm.invoke(prompt)
+        else:
+            response = st.session_state.llm.invoke(prompt)
+
         text = response.content if hasattr(
             response, "content") else str(response)
         questions = [q.strip() for q in text.split('\n') if q.strip()]
@@ -82,7 +108,8 @@ def process_question(question, answer_style):
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         debug_placeholder = st.empty()
-        st_callback = get_streamlit_cb(st.empty()) # CallBack handler get_streamlit_cb
+        # CallBack handler get_streamlit_cb
+        st_callback = get_streamlit_cb(st.empty())
 
         start_time = time.time()
 
@@ -161,14 +188,16 @@ def process_question(question, answer_style):
 
         # Optionally display the generation time if the timer is toggled on
         if st.session_state.get("show_timer", True):
-            response_placeholder.markdown(f"*Generation time: {generation_time:.2f} seconds*")
+            response_placeholder.markdown(
+                f"*Generation time: {generation_time:.2f} seconds*")
 
-        # Restore original stdout    
+        # Restore original stdout
         sys.stdout = sys.__stdout__
 
     # 3) Update the assistant message with the final response
     st.session_state.messages[assistant_index]["content"] = assistant_response
     st.session_state.followup_key += 1
+
 
 # -------------------- Page Layout & Configuration --------------------
 st.set_page_config(
@@ -269,7 +298,7 @@ with st.sidebar:
 
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
-    
+
     # Toggle for displaying generation time
     st.checkbox("Show generation time", value=True, key="show_timer")
     # RAG workflow initilizate.
@@ -284,7 +313,7 @@ try:
         st.session_state.answer_style
     )
 except Exception as e:
-   st.error("Error initializing model, continuing with previous model: " + str(e))
+    st.error("Error initializing model, continuing with previous model: " + str(e))
     # (Optional) Initialize your primary LLM if needed.
     # st.session_state.llm = ChatOpenAI(model="gpt-4o", temperature=0.5)
 
@@ -328,7 +357,8 @@ for message in st.session_state.messages:
 
 # Display the last generation time outside the chat messages if enabled.
 if st.session_state.get("show_timer", True) and "last_generation_time" in st.session_state:
-    st.markdown(f"<small>Last Generation Time: {st.session_state.last_generation_time:.2f} seconds</small>", unsafe_allow_html=True)
+    st.markdown(
+        f"<small>Last Generation Time: {st.session_state.last_generation_time:.2f} seconds</small>", unsafe_allow_html=True)
 
 # -------------------- Process a Pending Follow-Up (if any) --------------------
 if st.session_state.pending_followup is not None:
@@ -344,21 +374,19 @@ if user_input:
             "Your question exceeds 200 characters. Please shorten it and try again.")
     else:
         process_question(user_input, st.session_state.answer_style)
-        st.rerun()
 
 # -------------------- Helper function for Follow-Up --------------------
 
 
 def handle_followup(question: str):
     st.session_state.pending_followup = question
-    st.rerun()
 
 
 # -------------------- Generate and Display Follow-Up Questions --------------------
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
     try:
         last_assistant_message = st.session_state.messages[-1]["content"]
-        
+
         # Don't generate followup questions if response is empty or contains error messages
         if not last_assistant_message.strip() or "Sorry, I encountered an error" in last_assistant_message:
             st.session_state.followup_questions = []
@@ -372,7 +400,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
                  if msg["role"] == "user"),
                 ""
             )
-            
+
             # Generate new questions only if the last assistant message has changed
             if st.session_state.last_assistant != last_assistant_message:
                 print("Generating new followup questions")
