@@ -1,7 +1,7 @@
 import io
 import re
 import sys
-import time  # for minimal delay
+import time
 
 import streamlit as st
 import torch
@@ -10,6 +10,10 @@ from langchain_openai import ChatOpenAI
 
 from agentic_rag import initialize_app
 from st_callback import get_streamlit_cb
+
+# This code line below Fixes console "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+# reference: https://github.com/VikParuchuri/marker/issues/442#issuecomment-2636393925
+torch.classes.__path__ = []
 
 # Early session state initialization alternative way to set default values.
 # default_keys = {
@@ -31,16 +35,20 @@ from st_callback import get_streamlit_cb
 #     if key not in st.session_state:
 #         st.session_state[key] = default
 
-# time.sleep(0.1)  # optional delay to ensure proper initialization
+'''
+SETUP:
+    1. Install the required packages:
+        pip install -r requirements.txt
+    2. Set secters.toml environment variables .streamlit/secters.toml
+    3. Run the app:
+        streamlit run app.py
 
-
-# This Fixes console "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
-torch.classes.__path__ = []
-
-# TODO: App crashes when selecting "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
-st.set_option("client.showErrorDetails", False)  # Hide error details
+TODO: App crashes if using "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
+    Can be temp fixed by using ChatOpenAI as a fallback for routing model. Mixtral works still for selected_model
+'''
 
 # -------------------- Initialization --------------------
+st.set_option("client.showErrorDetails", False)  # Hide error detail
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "followup_key" not in st.session_state:
