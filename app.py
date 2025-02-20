@@ -34,7 +34,7 @@ from st_callback import get_streamlit_cb
 # time.sleep(0.1)  # optional delay to ensure proper initialization
 
 
-# Fix below for "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
+# This Fixes console "RuntimeError: Tried to instantiate class '__path__._path', but it does not exist!"
 torch.classes.__path__ = []
 
 # TODO: App crashes when selecting "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
