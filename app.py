@@ -15,6 +15,16 @@ from st_callback import get_streamlit_cb
 # reference: https://github.com/VikParuchuri/marker/issues/442#issuecomment-2636393925
 torch.classes.__path__ = []
 
+# SETUP:
+#     1. Install the required packages:
+#         pip install -r requirements.txt
+#     2. Set secters.toml environment variables .streamlit/secters.toml
+#     3. Run the app:
+#         streamlit run app.py
+
+# TODO: App crashes if using "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
+#     Can be temp fixed by using ChatOpenAI as a fallback for routing model. Mixtral works still for selected_model
+
 # Early session state initialization alternative way to set default values.
 # default_keys = {
 #     "messages": [],
@@ -35,17 +45,7 @@ torch.classes.__path__ = []
 #     if key not in st.session_state:
 #         st.session_state[key] = default
 
-'''
-SETUP:
-    1. Install the required packages:
-        pip install -r requirements.txt
-    2. Set secters.toml environment variables .streamlit/secters.toml
-    3. Run the app:
-        streamlit run app.py
 
-TODO: App crashes if using "llama-3.1-8b-instant" model. Or Mixtral for selected_routing_model.
-    Can be temp fixed by using ChatOpenAI as a fallback for routing model. Mixtral works still for selected_model
-'''
 
 # -------------------- Initialization --------------------
 st.set_option("client.showErrorDetails", False)  # Hide error detail
