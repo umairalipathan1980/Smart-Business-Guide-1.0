@@ -173,8 +173,8 @@ with st.sidebar:
         ["Reliable documents", "Reliable web sources", "Reliable docs & web sources"],
         index=0
     )
-    st.session_state.hybrid_search = (search_option == "Hybrid search (Guides + internet)")
-    st.session_state.internet_search = (search_option == "Internet search only")
+    st.session_state.hybrid_search = (search_option == "Reliable docs & web sources")
+    st.session_state.internet_search = (search_option == "Reliable web sources")
     
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
