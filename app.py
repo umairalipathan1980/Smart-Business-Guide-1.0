@@ -300,9 +300,9 @@ with st.sidebar:
         index=0
     )
     st.session_state.hybrid_search = (
-        search_option == "Hybrid search (Guides + internet)")
+        search_option == "Reliable docs & web sources")
     st.session_state.internet_search = (
-        search_option == "Internet search only")
+        search_option == "Reliable web sources")
 
     if st.button("🔄 Reset Conversation", key="reset_button"):
         st.session_state.messages = []
