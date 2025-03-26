@@ -264,44 +264,74 @@ with st.sidebar:
         "sentence-transformers/all-MiniLM-L6-v2"
     ]
 
-    with st.expander("⚙️ Settings", expanded=False):
-        st.session_state.selected_model = st.selectbox(
-            "🤖 Select Answering LLM",
-            model_list,
-            key="model_selector",
-            index=model_list.index(st.session_state.selected_model)
-        )
-        st.session_state.selected_routing_model = st.selectbox(
-            "📡 Select Routing LLM",
-            model_list,
-            key="routing_model_selector",
-            index=model_list.index(st.session_state.selected_routing_model)
-        )
-        st.session_state.selected_grading_model = st.selectbox(
-            "🧮 Select Retrieval Grading LLM",
-            model_list,
-            key="grading_model_selector",
-            index=model_list.index(st.session_state.selected_grading_model)
-        )
-        st.session_state.selected_embedding_model = st.selectbox(
-            "🧠 Select Embedding Model",
-            embed_list,
-            key="embedding_model_selector",
-            index=embed_list.index(st.session_state.selected_embedding_model)
-        )
-        answer_style = st.select_slider(
+    answer_style = st.select_slider(
             "💬 Answer Style",
             options=["Concise", "Moderate", "Explanatory"],
             value="Explanatory",
             key="answer_style_slider"
         )
-        st.session_state.answer_style = answer_style
+    st.session_state.answer_style = answer_style
+
+    # # Create a separate list without deepseek for routing and grading
+    # other_models_list = [model for model in model_list if model != "deepseek-r1-distill-llama-70b"]
+
+    # with st.expander("⚙️ Settings", expanded=False):
+    #     st.session_state.selected_model = st.selectbox(
+    #         "🤖 Select Answering LLM",
+    #         model_list,
+    #         key="model_selector",
+    #         index=min(model_list.index(st.session_state.selected_model) 
+    #                 if st.session_state.selected_model in model_list else 0, 
+    #                 len(model_list) - 1)
+    #     )
+        
+    #     # For routing model, use the list without deepseek
+    #     routing_index = (other_models_list.index(st.session_state.selected_routing_model) 
+    #                     if st.session_state.selected_routing_model in other_models_list 
+    #                     else 0)
+    #     st.session_state.selected_routing_model = st.selectbox(
+    #         "📡 Select Routing LLM",
+    #         other_models_list,
+    #         key="routing_model_selector",
+    #         index=routing_index
+    #     )
+        
+    #     # For grading model, use the list without deepseek
+    #     grading_index = (other_models_list.index(st.session_state.selected_grading_model) 
+    #                     if st.session_state.selected_grading_model in other_models_list 
+    #                     else 0)
+    #     st.session_state.selected_grading_model = st.selectbox(
+    #         "🧮 Select Retrieval Grading LLM",
+    #         other_models_list,
+    #         key="grading_model_selector",
+    #         index=grading_index
+    #     )
+    #     st.session_state.selected_embedding_model = st.selectbox(
+    #         "🧠 Select Embedding Model",
+    #         embed_list,
+    #         key="embedding_model_selector",
+    #         index=embed_list.index(st.session_state.selected_embedding_model)
+    #     )
+
+    ############################# hard-coded selected model without the option to select from the dropdown menu.
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = "gpt-4o"  
+    
+    if 'selected_routing_model' not in st.session_state:
+        st.session_state.selected_routing_model = "gpt-4o"  
+        
+    if 'selected_grading_model' not in st.session_state:
+        st.session_state.selected_grading_model = "gpt-4o"  
+        
+    if 'selected_embedding_model' not in st.session_state:
+        st.session_state.selected_embedding_model = "gpt-4o"  
+    ############################
 
     search_option = st.radio(
         "Search options",
         ["Reliable documents", "Reliable web sources",
             "Reliable docs & web sources"],
-        index=0
+        index=2
     )
     st.session_state.hybrid_search = (
         search_option == "Reliable docs & web sources")
