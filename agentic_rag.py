@@ -325,7 +325,7 @@ def initialize_grading_llm(selected_grading_model):
     if "grader_llm" not in st.session_state or st.session_state.grader_llm.model_name != selected_grading_model:
         if "gpt-" in selected_grading_model:
             st.session_state.grader_llm = ChatOpenAI(
-                model=selected_grading_model, temperature=0.0, max_tokens=16000)
+                model=selected_grading_model, temperature=0.0, max_tokens=8000)
         elif "deepseek-" in selected_grading_model:
             # Deepseek-models need "hidden" reasoning_format to prevent <think> tags from leaking
             st.session_state.grader_llm = ChatGroq(
@@ -359,12 +359,12 @@ rag_prompt = PromptTemplate(
 
                 1. **Question and answer language**: 
                 - Detect the question's main language (e.g., English, Finnish, Russian, Estonian, Arabic, or other) and always answer in the same language. If a question has english words and the words from some other language which doesn't have the same letters as English, the answer should be in other language.
-                - **very important**: make sure that your response is in the same language as the question's. 
+                - **very important**: Make sure that your response is in the same language as the question's. 
+
                 2. If the context documents contain 'Internt search results' in 'page_content' field, always consider them in your response. 
 
                 3. **Context-Only Answers with a given answer style**:
                 - Always base your answers on the provided context and answer style.
-
                 - If the context explicitly states 'I apologize, but I'm designed to answer questions specifically related to business and entrepreneurship in Finland,' output this context verbatim.
 
                 4. **Response style**:
@@ -374,8 +374,7 @@ rag_prompt = PromptTemplate(
                 - if the context contains documents with two different 'page_content' with the names 'Smart guide results:' and 'Internet search results:', strictly follow the format for answer generation specified in rule 9: "hybrid context handling". In that case, create two distinct sections even for 'concise' answer style.
                 - If answer style = "Concise", generate a concise answer. But create the two sections as mentioned before if there are two different 'page_content'.
                 - If answer style = "Moderate", use a moderate approach to generate answer where you can provide a little bit more explanation and elaborate the answer to improve clarity, integrating your own experience. 
-                - If answer style = "Explanatory", provide a detailed and elaborated answer by providing more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience. However, the explanations, examples and illustrations should be strictly based on the context. 
-
+                - If answer style = "Explanatory", provide a detailed and elaborated answer in the question' language by providing more explanations with examples and illustrations to improve clarity in best possible way, integrating your own experience. However, the explanations, examples and illustrations should be strictly based on the context. 
                 6. **Conversational tone**
                  - Maintain a conversational and helping style which should tend to guide the user and provide him help, hints and offers to further help and information. 
                  - Use simple language. Explain difficult concepts or terms wherever needed. Present the information in the best readable form.
@@ -412,6 +411,7 @@ rag_prompt = PromptTemplate(
     input_variables=["question", "context", "answer_style"]
 
 )
+
 
 def initialize_grader_chain():
     # Data model for LLM output format
