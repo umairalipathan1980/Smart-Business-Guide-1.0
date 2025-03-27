@@ -358,7 +358,7 @@ rag_prompt = PromptTemplate(
                 Your responses must strictly adhere to the provided context, answer style, and question's language using the follow rules:
 
                 1. **Question and answer language**: 
-                - Detect the question's language (e.g., English, Finnish, Russian, Estonian, Arabic) and answer in the same language. The context could be in English or any other languge. 
+                - Detect the question's and context's language (e.g., English, Finnish, Russian, Estonian, Arabic, or other) and answer in the same language. The context could be in English or any other languge. 
                 - **very important**: make sure that your response is in the same language as the question's. 
                 2. If the context documents contain 'Internt search results' in 'page_content' field, always consider them in your response. 
 
